@@ -19,19 +19,23 @@
   input:focus, textarea:focus, select:focus { outline:2px solid #35c28c55; }
   .tab.active { color:#35c28c; border-color:#35c28c; }
   table { width:100%; border-collapse:collapse; }
-  th { text-align:left; color:#9fb0d0; font-weight:600; position:sticky; top:0; background:#15203a; }
-  td, th { padding:9px 12px; border-bottom:1px solid #1f2c4a; vertical-align:top; }
+  th { text-align:left; color:#9fb0d0; font-weight:600; }
+  td, th { padding:8px 11px; border-bottom:1px solid #1f2c4a; vertical-align:top; }
   tbody tr.click:hover { background:#1a2745; cursor:pointer; }
   .pill { font-size:11px; padding:2px 8px; border-radius:999px; }
   .bar { background:#0f1830; border-radius:999px; overflow:hidden; }
   .bar > div { background:linear-gradient(90deg,#35c28c,#4f9cf5); height:100%; transition:width .3s; }
+  .setitem { cursor:pointer; border:1px solid transparent; }
+  .setitem:hover { background:#172445; }
+  .setitem.active { background:#15203a; border-color:#35c28c; }
   ::-webkit-scrollbar{height:9px;width:9px} ::-webkit-scrollbar-thumb{background:#26365c;border-radius:9px}
   .modal-bg { background:rgba(6,10,22,.72); backdrop-filter:blur(2px); }
+  .prose-invert :where(p){margin:.4em 0} .prose-invert :where(h1,h2,h3){color:#fff;margin:.6em 0 .3em}
 </style>
 </head>
 <body class="min-h-screen">
 <header class="border-b border-[#1f2c4a] sticky top-0 z-20" style="background:#0d1426">
-  <div class="w-[95%] max-w-[1500px] mx-auto px-2 py-3 flex items-center gap-5">
+  <div class="w-[96%] max-w-[1600px] mx-auto px-2 py-3 flex items-center gap-5">
     <div>
       <div class="text-2xl font-bold leading-none">can<span class="accent">job</span></div>
       <div class="text-[11px] text-[#7e8db0] mt-0.5">candidate <span class="accent2">→</span> job · intelligent discovery &amp; ranking</div>
@@ -44,39 +48,50 @@
   </div>
 </header>
 
-<main class="w-[95%] max-w-[1500px] mx-auto px-2 py-6">
+<main class="w-[96%] max-w-[1600px] mx-auto px-2 py-6">
 
   <!-- JOBS -->
-  <section id="view-jobs">
+  <section id="view-jobs" class="grid grid-cols-[260px_1fr] gap-5">
+    <aside class="card rounded-xl p-3">
+      <div class="flex items-center mb-2"><h3 class="text-sm font-semibold">Job sets</h3>
+        <button onclick="addJobSet()" class="btn2 ml-auto rounded px-2 py-1 text-xs">+ Set</button></div>
+      <div id="jobsets"></div>
+    </aside>
     <div class="card rounded-xl p-4">
-      <div class="flex items-center mb-3 gap-3">
-        <h2 class="font-semibold">Jobs <span id="j-count" class="text-xs text-[#7e8db0]"></span></h2>
-        <button onclick="openAddJob()" class="btn ml-auto rounded-lg px-3 py-1.5 text-sm">+ Add job</button>
+      <div class="flex items-center mb-3 gap-2 flex-wrap">
+        <h2 class="font-semibold" id="jobs-title">Jobs</h2>
+        <div class="ml-auto flex gap-2">
+          <button onclick="openAddJob()" class="btn rounded-lg px-3 py-1.5 text-sm">+ Add job</button>
+          <a id="jobs-csv" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export CSV</a>
+          <a id="jobs-pdf" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export PDF</a>
+        </div>
       </div>
       <div class="overflow-x-auto"><table>
-        <thead><tr><th class="w-16">#</th><th>Title</th><th>Type</th><th>Runs</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
+        <thead><tr><th class="w-12">#</th><th>Title</th><th>Type</th><th>Runs</th><th>Created</th><th class="text-right">Actions</th></tr></thead>
         <tbody id="jobs-body"></tbody>
       </table></div>
-      <div class="flex items-center gap-3 mt-3 text-sm">
-        <span class="text-[#9fb0d0] text-xs">Per page</span>
-        <select id="j-perpage" class="rounded-lg px-2 py-1 text-sm" onchange="jPage=0;renderJobs()"><option>10</option><option selected>25</option><option>50</option><option>100</option></select>
-        <button onclick="jobPage(-1)" class="btn2 rounded-lg px-3 py-1">Prev</button>
-        <span id="j-pageinfo" class="text-[#9fb0d0]"></span>
-        <button onclick="jobPage(1)" class="btn2 rounded-lg px-3 py-1">Next</button>
-      </div>
     </div>
   </section>
 
   <!-- CANDIDATES -->
-  <section id="view-candidates" class="hidden">
+  <section id="view-candidates" class="hidden grid grid-cols-[260px_1fr] gap-5">
+    <aside class="card rounded-xl p-3">
+      <div class="flex items-center mb-2"><h3 class="text-sm font-semibold">Candidate sets</h3></div>
+      <div id="candsets"></div>
+      <button onclick="saveSelectionAsSet()" class="btn2 w-full rounded px-2 py-1.5 text-xs mt-2">Save page selection as set</button>
+    </aside>
     <div class="card rounded-xl p-4">
-      <div class="flex items-center mb-3 gap-3 flex-wrap">
-        <h2 class="font-semibold">Candidates <span id="c-count" class="text-xs text-[#7e8db0]"></span></h2>
-        <input id="c-search" class="rounded-lg px-3 py-1.5 text-sm w-56" placeholder="Search id / title / location…" oninput="debouncedSearch()" />
-        <button onclick="openAddCandidate()" class="btn ml-auto rounded-lg px-3 py-1.5 text-sm">+ Add candidate</button>
+      <div class="flex items-center mb-3 gap-2 flex-wrap">
+        <h2 class="font-semibold" id="cand-title">Candidates</h2>
+        <input id="c-search" class="rounded-lg px-3 py-1.5 text-sm w-56" placeholder="Search id / title / location / headline…" oninput="debouncedSearch()" />
+        <div class="ml-auto flex gap-2">
+          <button onclick="openAddCandidate()" class="btn rounded-lg px-3 py-1.5 text-sm">+ Add</button>
+          <a id="cand-csv" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export CSV</a>
+          <a id="cand-pdf" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export PDF</a>
+        </div>
       </div>
       <div class="overflow-x-auto"><table>
-        <thead><tr><th>ID</th><th>Title</th><th>YoE</th><th>Location</th><th class="text-right">Actions</th></tr></thead>
+        <thead><tr><th class="w-8"><input type="checkbox" id="c-all" onchange="toggleAll(this)"></th><th>ID</th><th>Title</th><th>YoE</th><th>Location</th><th>Headline</th><th class="text-right">Actions</th></tr></thead>
         <tbody id="cand-body"></tbody>
       </table></div>
       <div class="flex items-center gap-3 mt-3 text-sm">
@@ -85,7 +100,7 @@
         <button onclick="candPage(-1)" class="btn2 rounded-lg px-3 py-1">Prev</button>
         <span id="cand-page" class="text-[#9fb0d0]"></span>
         <button onclick="candPage(1)" class="btn2 rounded-lg px-3 py-1">Next</button>
-        <span class="text-[#7e8db0] text-xs ml-2">Tip: click a row to view full profile</span>
+        <span class="text-[#7e8db0] text-xs ml-2">Click a row for the full profile</span>
       </div>
     </div>
   </section>
@@ -93,17 +108,23 @@
   <!-- MATCHING -->
   <section id="view-matching" class="hidden">
     <div class="card rounded-xl p-4 mb-5 flex flex-wrap items-end gap-5">
-      <div><div class="text-xs text-[#7e8db0]">Candidates in pool</div><div id="m-count" class="text-2xl font-bold accent">—</div></div>
+      <div><div class="text-xs text-[#7e8db0]">Pool</div><div id="m-count" class="text-2xl font-bold accent">—</div></div>
       <div><label class="text-xs text-[#7e8db0] block">Top K</label><input id="m-topk" type="number" value="100" class="rounded-lg px-3 py-1.5 text-sm w-24" /></div>
-      <div><label class="text-xs text-[#7e8db0] block">Candidate limit (0 = all)</label><input id="m-limit" type="number" value="0" class="rounded-lg px-3 py-1.5 text-sm w-32" /></div>
-      <p class="text-xs text-[#7e8db0] flex-1 min-w-[240px]">Pick a job and run a match over the pool. Progress and the results viewer are stored server-side, so they persist across refreshes.</p>
+      <button onclick="runAll()" class="btn rounded-lg px-4 py-2 text-sm">Run all combinations</button>
+      <p class="text-xs text-[#7e8db0] flex-1 min-w-[260px]">Matrix of <b>jobs × candidate sets</b>. Run a single cell, a whole row (job × all sets), a whole column (set × all jobs), or everything. Status persists across refreshes.</p>
     </div>
-    <div id="match-jobs" class="grid md:grid-cols-2 xl:grid-cols-3 gap-5"></div>
+    <div class="card rounded-xl p-4 overflow-x-auto">
+      <table id="matrix"></table>
+    </div>
 
     <div id="results" class="card rounded-xl p-5 mt-5 hidden">
       <div class="flex items-center mb-3 gap-3 flex-wrap">
         <h3 class="font-semibold">Results <span id="results-meta" class="text-xs text-[#7e8db0]"></span></h3>
-        <button onclick="closeResults()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button>
+        <div class="ml-auto flex gap-2">
+          <a id="res-csv" class="btn2 rounded-lg px-3 py-1 text-xs" href="#">Export CSV</a>
+          <a id="res-pdf" class="btn rounded-lg px-3 py-1 text-xs" href="#">Export PDF</a>
+          <button onclick="closeResults()" class="btn2 rounded-lg px-3 py-1 text-xs">Close</button>
+        </div>
       </div>
       <div class="overflow-x-auto"><table>
         <thead><tr><th class="w-12">#</th><th>Candidate</th><th class="w-24">Score</th><th>Reasoning</th></tr></thead>
@@ -113,224 +134,248 @@
   </section>
 </main>
 
-<!-- generic modal -->
 <div id="modal" class="fixed inset-0 z-30 hidden items-start justify-center modal-bg overflow-y-auto py-10" onclick="if(event.target===this)closeModal()">
-  <div id="modal-card" class="card rounded-2xl w-[92%] max-w-3xl mx-auto p-6 shadow-2xl"></div>
+  <div id="modal-card" class="card rounded-2xl w-[92%] max-w-4xl mx-auto p-6 shadow-2xl"></div>
 </div>
-
 <div id="toast" class="fixed bottom-5 right-5 card2 rounded-lg px-4 py-2 text-sm hidden z-40"></div>
 
 <script>
+marked.setOptions({ breaks: true, gfm: true });
 const $ = (s) => document.querySelector(s);
 async function api(path, opts) {
   const r = await fetch("/api" + path, opts);
-  if (!r.ok) { const t = await r.text(); throw new Error(t || r.status); }
+  if (!r.ok) throw new Error((await r.text()) || r.status);
   return r.status === 204 ? null : r.json();
 }
-function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); setTimeout(() => t.classList.add("hidden"), 2400); }
+function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.remove("hidden"); setTimeout(() => t.classList.add("hidden"), 2400); }
 function esc(s) { return (s ?? "").toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
-function fmtDur(s) { if (s == null) return "—"; if (s < 60) return s + "s"; const m = Math.floor(s/60), sec = s%60; if (m < 60) return `${m}m ${sec}s`; const h = Math.floor(m/60); return `${h}h ${m%60}m`; }
-
-// ---- modal ----
-function openModal(html) { $("#modal-card").innerHTML = html; $("#modal").classList.remove("hidden"); $("#modal").classList.add("flex"); }
+function fmtDur(s) { if (s == null) return "—"; if (s < 60) return s + "s"; const m = Math.floor(s/60); return m < 60 ? `${m}m ${s%60}s` : `${Math.floor(m/60)}h ${m%60}m`; }
+function openModal(h) { $("#modal-card").innerHTML = h; $("#modal").classList.remove("hidden"); $("#modal").classList.add("flex"); }
 function closeModal() { $("#modal").classList.add("hidden"); $("#modal").classList.remove("flex"); }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
 
-// ---- tabs ----
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 async function showTab(name) {
   document.querySelectorAll(".tab").forEach(t => { const on = t.dataset.tab === name; t.classList.toggle("active", on); t.classList.toggle("text-[#9fb0d0]", !on); });
   ["jobs","candidates","matching"].forEach(v => $("#view-" + v).classList.toggle("hidden", v !== name));
-  if (name === "jobs") await loadJobs();
-  if (name === "candidates") await loadCandidates();
+  if (name === "jobs") await loadJobsTab();
+  if (name === "candidates") await loadCandidatesTab();
   if (name === "matching") await loadMatching();
 }
 
-// ---- jobs ----
-let allJobs = [], jPage = 0;
-function jPer() { return parseInt($("#j-perpage").value) || 25; }
-async function loadJobs() { allJobs = await api("/jobs"); jPage = 0; renderJobs(); }
-function renderJobs() {
-  const per = jPer(), start = jPage * per, slice = allJobs.slice(start, start + per);
-  $("#j-count").textContent = `(${allJobs.length})`;
-  $("#jobs-body").innerHTML = slice.map((j, i) => `
-    <tr>
-      <td class="text-[#7e8db0]">${start + i + 1}</td>
+// =============================== JOBS =====================================
+let jobSets = [], curJobSet = null;
+async function loadJobsTab() { jobSets = await api("/job-sets"); renderJobSets(); await loadJobs(); }
+function renderJobSets() {
+  const items = [{ id: null, name: "All jobs", count: jobSets.reduce((a, s) => Math.max(a, 0), 0) }].concat(jobSets);
+  $("#jobsets").innerHTML = items.map(s => `
+    <div class="setitem rounded-lg px-2 py-1.5 mb-1 flex items-center gap-2 ${curJobSet === s.id ? 'active' : ''}" onclick="curJobSet=${s.id===null?'null':s.id};renderJobSets();loadJobs()">
+      <span class="text-sm">${esc(s.name)}</span>
+      ${s.id !== null ? `<span class="pill ml-auto" style="background:#0f1830;color:#9fb0d0">${s.count}</span>` : '<span class="ml-auto"></span>'}
+      ${(s.id !== null && !s.is_default) ? `<button onclick="event.stopPropagation();delJobSet(${s.id})" class="text-[#ff9bb0] text-xs">✕</button>` : ''}
+    </div>`).join("");
+}
+async function addJobSet() { const n = prompt("New job set name:"); if (!n) return; await api("/job-sets", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ name:n }) }); loadJobsTab(); }
+async function delJobSet(id) { await api("/job-sets/" + id, { method:"DELETE" }); curJobSet = null; loadJobsTab(); }
+async function loadJobs() {
+  const jobs = await api("/jobs" + (curJobSet ? `?set_id=${curJobSet}` : ""));
+  const setName = curJobSet ? (jobSets.find(s => s.id === curJobSet)?.name || "") : "All jobs";
+  $("#jobs-title").textContent = `${setName} (${jobs.length})`;
+  const qs = curJobSet ? `?set_id=${curJobSet}` : "";
+  $("#jobs-csv").href = "/api/export/jobs.csv" + qs; $("#jobs-pdf").href = "/api/export/jobs.pdf" + qs;
+  $("#jobs-body").innerHTML = jobs.map((j, i) => `
+    <tr class="click" onclick='viewJD(${j.id})'>
+      <td class="text-[#7e8db0]">${i + 1}</td>
       <td class="font-medium">${esc(j.name)}</td>
       <td>${j.is_default ? '<span class="pill" style="background:#0c2c22;color:#35c28c">default · tuned</span>' : '<span class="pill" style="background:#10243f;color:#4f9cf5">ad-hoc</span>'}</td>
       <td>${j.run_count}</td>
       <td class="text-[#9fb0d0] text-xs">${esc(j.created_at || '')}</td>
       <td class="text-right whitespace-nowrap">
-        <button onclick='viewJD(${j.id})' class="btn2 rounded px-2 py-1 text-xs">View JD</button>
-        ${j.is_default ? '' : `<button onclick='delJob(${j.id})' class="btn-danger rounded px-2 py-1 text-xs ml-1">Delete</button>`}
+        <button onclick='event.stopPropagation();viewJD(${j.id})' class="btn2 rounded px-2 py-1 text-xs">View JD</button>
+        ${j.is_default ? '' : `<button onclick='event.stopPropagation();delJob(${j.id})' class="btn-danger rounded px-2 py-1 text-xs ml-1">Delete</button>`}
       </td>
-    </tr>`).join("");
-  const total = allJobs.length;
-  $("#j-pageinfo").textContent = total ? `${start + 1}–${Math.min(start + per, total)} of ${total}` : "0";
+    </tr>`).join("") || `<tr><td colspan="6" class="text-[#7e8db0] text-sm">No jobs in this set.</td></tr>`;
 }
-function jobPage(d) { const n = jPage + d; if (n >= 0 && n * jPer() < allJobs.length) { jPage = n; renderJobs(); } }
 function openAddJob() {
+  const opts = jobSets.map(s => `<label class="inline-flex items-center gap-1 mr-3 text-sm"><input type="checkbox" class="js-set" value="${s.id}" ${s.id===curJobSet?'checked':''}> ${esc(s.name)}</label>`).join("");
   openModal(`
-    <div class="flex items-center mb-4"><h3 class="text-lg font-semibold">Add a job</h3>
-      <button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
+    <div class="flex items-center mb-4"><h3 class="text-lg font-semibold">Add a job</h3><button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
     <label class="text-xs text-[#9fb0d0]">Job title</label>
     <input id="job-name" class="w-full rounded-lg px-3 py-2 mt-1 mb-3 text-sm" placeholder="e.g. Senior ML Engineer" />
     <label class="text-xs text-[#9fb0d0]">Job description (markdown supported)</label>
-    <textarea id="job-jd" rows="16" class="w-full rounded-lg px-3 py-2 mt-1 text-sm font-mono leading-relaxed" placeholder="Paste the full job description here…"></textarea>
-    <p class="text-xs text-[#7e8db0] mt-2">Ad-hoc jobs are ranked from their JD text (lexical + rules). The default job additionally uses tuned facets + precomputed semantic scores.</p>
+    <textarea id="job-jd" rows="15" class="w-full rounded-lg px-3 py-2 mt-1 text-sm font-mono leading-relaxed"></textarea>
+    <div class="mt-3">${opts || '<span class="text-xs text-[#7e8db0]">No sets yet</span>'}</div>
+    <p class="text-xs text-[#7e8db0] mt-2">Ad-hoc jobs are ranked from their JD text. The default job uses tuned facets + precomputed semantic scores.</p>
     <button onclick="addJob()" class="btn w-full rounded-lg py-2.5 mt-4 text-sm">Add job</button>`);
   setTimeout(() => $("#job-name").focus(), 50);
 }
 async function addJob() {
   const name = $("#job-name").value.trim(), jd = $("#job-jd").value.trim();
   if (!name || !jd) return toast("Name and JD required");
-  await api("/jobs", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ name, jd_markdown: jd }) });
-  closeModal(); toast("Job added"); loadJobs();
+  const set_ids = [...document.querySelectorAll(".js-set:checked")].map(c => parseInt(c.value));
+  await api("/jobs", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ name, jd_markdown: jd, set_ids }) });
+  closeModal(); toast("Job added"); loadJobsTab();
 }
-async function delJob(id) { await api("/jobs/" + id, { method: "DELETE" }); loadJobs(); }
+async function delJob(id) { await api("/jobs/" + id, { method:"DELETE" }); loadJobs(); }
 async function viewJD(id) {
   const j = await api("/jobs/" + id);
   openModal(`
-    <div class="flex items-center mb-3"><h3 class="text-lg font-semibold">${esc(j.name)}</h3>
-      <button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
-    <div class="prose prose-invert max-w-none text-sm leading-relaxed max-h-[70vh] overflow-y-auto pr-2">${marked.parse(j.jd_markdown || "")}</div>`);
+    <div class="flex items-center mb-3"><h3 class="text-lg font-semibold">${esc(j.name)}</h3><button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
+    <div class="prose-invert text-sm leading-relaxed max-h-[72vh] overflow-y-auto pr-2 text-[#d4deef]">${marked.parse(j.jd_markdown || "")}</div>`);
 }
 
-// ---- candidates ----
-let cOffset = 0, cQuery = "", cTotal = 0, cLimit = 25;
+// ============================ CANDIDATES ==================================
+let candSets = [], curCandSet = null, cOffset = 0, cQuery = "", cTotal = 0, cLimit = 25, selected = new Set();
+async function loadCandidatesTab() {
+  candSets = await api("/candidate-sets");
+  if (curCandSet === null) curCandSet = (candSets.find(s => s.is_default) || candSets[0] || {}).id ?? null;
+  renderCandSets(); await loadCandidates();
+}
+function renderCandSets() {
+  $("#candsets").innerHTML = candSets.map(s => `
+    <div class="setitem rounded-lg px-2 py-1.5 mb-1 flex items-center gap-2 ${curCandSet === s.id ? 'active' : ''}" onclick="curCandSet=${s.id};cOffset=0;selected.clear();renderCandSets();loadCandidates()">
+      <span class="text-sm">${esc(s.name)}</span>
+      <span class="pill ml-auto" style="background:#0f1830;color:#9fb0d0">${s.count.toLocaleString()}</span>
+      ${(!s.is_default && s.kind !== 'all') ? `<button onclick="event.stopPropagation();delCandSet(${s.id})" class="text-[#ff9bb0] text-xs">✕</button>` : ''}
+    </div>`).join("");
+}
+async function delCandSet(id) { await api("/candidate-sets/" + id, { method:"DELETE" }); curCandSet = null; loadCandidatesTab(); }
 async function loadCandidates() {
-  const d = await api(`/candidates?offset=${cOffset}&limit=${cLimit}&q=${encodeURIComponent(cQuery)}`);
+  const qs = `set_id=${curCandSet}&offset=${cOffset}&limit=${cLimit}&q=${encodeURIComponent(cQuery)}`;
+  const d = await api("/candidates?" + qs);
   cTotal = d.total;
-  $("#c-count").textContent = `(${d.total.toLocaleString()})`;
-  $("#cand-body").innerHTML = d.items.map(c => `
-    <tr class="click" onclick='viewCandidate("${esc(c.candidate_id)}")'>
+  const setName = candSets.find(s => s.id === curCandSet)?.name || "Candidates";
+  $("#cand-title").textContent = `${setName} (${d.total.toLocaleString()})`;
+  $("#cand-csv").href = `/api/export/candidates.csv?set_id=${curCandSet}`;
+  $("#cand-pdf").href = `/api/export/candidates.pdf?set_id=${curCandSet}`;
+  $("#cand-body").innerHTML = d.items.map(c => {
+    const hl = (c.headline || c.title || "").slice(0, 70);
+    const more = c.summary_len ? ` <span class="text-[#7e8db0]">· summary +${c.summary_len} chars</span>` : "";
+    return `<tr class="click" onclick='viewCandidate("${esc(c.candidate_id)}")'>
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="c-sel" value="${esc(c.candidate_id)}" ${selected.has(c.candidate_id)?'checked':''} onchange="toggleSel(this)"></td>
       <td class="font-mono text-xs accent2">${esc(c.candidate_id)} ${c.added ? '<span class="pill" style="background:#10243f;color:#4f9cf5">added</span>' : ''}</td>
       <td>${esc(c.title)}</td><td>${c.yoe ?? '—'}</td><td class="text-[#9fb0d0]">${esc(c.location)}</td>
+      <td class="text-[#c7d2e8] text-xs">${esc(hl)}${c.headline && c.headline.length > 70 ? '…' : ''}${more}</td>
       <td class="text-right"><button onclick='event.stopPropagation();delCand("${esc(c.candidate_id)}")' class="btn-danger rounded px-2 py-1 text-xs">Remove</button></td>
-    </tr>`).join("");
+    </tr>`;
+  }).join("") || `<tr><td colspan="7" class="text-[#7e8db0] text-sm">No candidates.</td></tr>`;
   const from = d.total ? cOffset + 1 : 0;
   $("#cand-page").textContent = `${from}–${Math.min(cOffset + cLimit, d.total)} of ${d.total.toLocaleString()}`;
+  $("#c-all").checked = false;
 }
-function candPage(dir) { const n = cOffset + dir * cLimit; if (n >= 0 && n < cTotal) { cOffset = n; loadCandidates(); } }
-let searchTimer; function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(() => { cQuery = $("#c-search").value.trim(); cOffset = 0; loadCandidates(); }, 250); }
+function toggleSel(cb) { cb.checked ? selected.add(cb.value) : selected.delete(cb.value); }
+function toggleAll(cb) { document.querySelectorAll(".c-sel").forEach(x => { x.checked = cb.checked; toggleSel(x); }); }
+function candPage(d) { const n = cOffset + d * cLimit; if (n >= 0 && n < cTotal) { cOffset = n; loadCandidates(); } }
+let st; function debouncedSearch() { clearTimeout(st); st = setTimeout(() => { cQuery = $("#c-search").value.trim(); cOffset = 0; loadCandidates(); }, 250); }
+async function saveSelectionAsSet() {
+  if (!selected.size) return toast("Select some candidates first (checkboxes)");
+  const n = prompt(`Name for a set of ${selected.size} candidates:`); if (!n) return;
+  await api("/candidate-sets", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ name:n, candidate_ids:[...selected] }) });
+  selected.clear(); toast("Set created"); loadCandidatesTab();
+}
 function openAddCandidate() {
   openModal(`
-    <div class="flex items-center mb-4"><h3 class="text-lg font-semibold">Add a candidate</h3>
-      <button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
+    <div class="flex items-center mb-4"><h3 class="text-lg font-semibold">Add a candidate</h3><button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
     <label class="text-xs text-[#9fb0d0]">Current title</label>
-    <input id="c-title" class="w-full rounded-lg px-3 py-2 mt-1 mb-3 text-sm" placeholder="e.g. ML Engineer" />
+    <input id="c-title" class="w-full rounded-lg px-3 py-2 mt-1 mb-3 text-sm" />
     <div class="flex gap-3 mb-3">
       <div class="w-1/2"><label class="text-xs text-[#9fb0d0]">Years of experience</label><input id="c-yoe" type="number" step="0.1" class="w-full rounded-lg px-3 py-2 mt-1 text-sm" /></div>
       <div class="w-1/2"><label class="text-xs text-[#9fb0d0]">Location</label><input id="c-loc" class="w-full rounded-lg px-3 py-2 mt-1 text-sm" /></div>
     </div>
     <label class="text-xs text-[#9fb0d0]">Skills (comma separated)</label>
-    <input id="c-skills" class="w-full rounded-lg px-3 py-2 mt-1 mb-3 text-sm" placeholder="Python, FAISS, embeddings, ranking" />
+    <input id="c-skills" class="w-full rounded-lg px-3 py-2 mt-1 mb-3 text-sm" />
     <label class="text-xs text-[#9fb0d0]">Summary</label>
     <textarea id="c-summary" rows="4" class="w-full rounded-lg px-3 py-2 mt-1 text-sm"></textarea>
-    <button onclick="addCandidate()" class="btn w-full rounded-lg py-2.5 mt-4 text-sm">Add candidate</button>`);
+    <button onclick="addCandidate()" class="btn w-full rounded-lg py-2.5 mt-4 text-sm">Add candidate to "${esc(candSets.find(s=>s.id===curCandSet)?.name||'pool')}"</button>`);
   setTimeout(() => $("#c-title").focus(), 50);
 }
 async function addCandidate() {
-  const body = { title: $("#c-title").value, yoe: parseFloat($("#c-yoe").value) || null, location: $("#c-loc").value, skills: $("#c-skills").value, summary: $("#c-summary").value };
+  const body = { title:$("#c-title").value, yoe:parseFloat($("#c-yoe").value)||null, location:$("#c-loc").value, skills:$("#c-skills").value, summary:$("#c-summary").value, set_ids: (curCandSet && candSets.find(s=>s.id===curCandSet)?.kind!=='all') ? [curCandSet] : [] };
   if (!body.title) return toast("Title required");
-  await api("/candidates", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
-  closeModal(); toast("Candidate added"); cOffset = 0; loadCandidates();
+  await api("/candidates", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  closeModal(); toast("Candidate added"); cOffset = 0; loadCandidatesTab();
 }
-async function delCand(id) { await api("/candidates/" + encodeURIComponent(id), { method: "DELETE" }); loadCandidates(); }
-
-function section(title, html) { return html ? `<div class="mb-4"><div class="text-xs uppercase tracking-wide accent2 mb-1">${title}</div>${html}</div>` : ""; }
+async function delCand(id) { await api("/candidates/" + encodeURIComponent(id), { method:"DELETE" }); loadCandidates(); }
+function sec(t, h) { return h ? `<div class="mb-4"><div class="text-xs uppercase tracking-wide accent2 mb-1">${t}</div>${h}</div>` : ""; }
 async function viewCandidate(id) {
   openModal(`<div class="text-sm text-[#9fb0d0]">Loading ${esc(id)}…</div>`);
-  let c; try { c = await api("/candidates/" + encodeURIComponent(id)); } catch { return openModal(`<div>Could not load candidate.</div>`); }
+  let c; try { c = await api("/candidates/" + encodeURIComponent(id)); } catch { return openModal("<div>Could not load candidate.</div>"); }
   const p = c.profile || {};
-  const skills = (c.skills || []).map(s => `<span class="pill mr-1 mb-1 inline-block" style="background:#10243f;color:#bcd2f5">${esc(s.name)} · ${esc(s.proficiency || '')}${s.duration_months ? ' · ' + s.duration_months + 'mo' : ''}</span>`).join("");
-  const career = (c.career_history || []).map(h => `<div class="mb-1"><span class="font-medium">${esc(h.title || '')}</span> <span class="text-[#9fb0d0]">@ ${esc(h.company || '')}</span> <span class="text-[#7e8db0] text-xs">${esc(h.start_date || '')} – ${esc(h.end_date || 'present')}</span></div>`).join("");
-  const edu = (c.education || []).map(e => `<div class="text-sm">${esc(e.degree || '')} ${e.field ? '· ' + esc(e.field) : ''} <span class="text-[#9fb0d0]">${esc(e.institution || '')}</span></div>`).join("");
+  const skills = (c.skills || []).map(s => `<span class="pill mr-1 mb-1 inline-block" style="background:#10243f;color:#bcd2f5">${esc(s.name)} · ${esc(s.proficiency||'')}${s.duration_months?' · '+s.duration_months+'mo':''}</span>`).join("");
+  const career = (c.career_history || []).map(h => `<div class="mb-1"><span class="font-medium">${esc(h.title||'')}</span> <span class="text-[#9fb0d0]">@ ${esc(h.company||'')}</span> <span class="text-[#7e8db0] text-xs">${esc(h.start_date||'')} – ${esc(h.end_date||'present')}</span></div>`).join("");
+  const edu = (c.education || []).map(e => `<div class="text-sm">${esc(e.degree||'')} ${e.field?'· '+esc(e.field):''} <span class="text-[#9fb0d0]">${esc(e.institution||'')}</span></div>`).join("");
   const sig = c.redrob_signals || {};
-  const sigRows = Object.entries(sig).map(([k, v]) => `<div class="flex justify-between border-b border-[#1f2c4a] py-1"><span class="text-[#9fb0d0]">${esc(k)}</span><span>${esc(typeof v === 'object' ? JSON.stringify(v) : v)}</span></div>`).join("");
+  const sigRows = Object.entries(sig).map(([k, v]) => `<div class="flex justify-between border-b border-[#1f2c4a] py-1"><span class="text-[#9fb0d0]">${esc(k)}</span><span>${esc(typeof v==='object'?JSON.stringify(v):v)}</span></div>`).join("");
   openModal(`
-    <div class="flex items-center mb-1"><h3 class="text-lg font-semibold">${esc(p.current_title || p.headline || id)}</h3>
-      <button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
-    <div class="text-xs text-[#7e8db0] mb-4 font-mono">${esc(id)} · ${esc(p.location || '')}${p.country ? ', ' + esc(p.country) : ''} · ${p.years_of_experience ?? '—'} yrs ${p.current_company ? '· @ ' + esc(p.current_company) : ''}</div>
+    <div class="flex items-center mb-1"><h3 class="text-lg font-semibold">${esc(p.current_title||p.headline||id)}</h3><button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
+    <div class="text-xs text-[#7e8db0] mb-4 font-mono">${esc(id)} · ${esc(p.location||'')}${p.country?', '+esc(p.country):''} · ${p.years_of_experience ?? '—'} yrs ${p.current_company?'· @ '+esc(p.current_company):''}</div>
     <div class="max-h-[68vh] overflow-y-auto pr-2">
-      ${section("Headline", p.headline ? `<div class="text-sm">${esc(p.headline)}</div>` : "")}
-      ${section("Summary", p.summary ? `<div class="text-sm leading-relaxed text-[#c7d2e8]">${esc(p.summary)}</div>` : "")}
-      ${section("Skills", skills)}
-      ${section("Career history", career)}
-      ${section("Education", edu)}
-      ${section("Redrob signals", sigRows ? `<div class="text-sm">${sigRows}</div>` : "")}
+      ${sec("Headline", p.headline?`<div class="text-sm">${esc(p.headline)}</div>`:"")}
+      ${sec("Summary", p.summary?`<div class="text-sm leading-relaxed text-[#c7d2e8]">${esc(p.summary)}</div>`:"")}
+      ${sec("Skills", skills)} ${sec("Career history", career)} ${sec("Education", edu)}
+      ${sec("Redrob signals", sigRows?`<div class="text-sm">${sigRows}</div>`:"")}
     </div>`);
 }
 
-// ---- matching ----
-const polling = {};
-function closeResults() { localStorage.removeItem("canjob_run"); $("#results").classList.add("hidden"); }
+// ============================== MATCHING ==================================
+let pollTimer = null;
 async function loadMatching() {
-  const s = await api("/matching/summary");
-  $("#m-count").textContent = s.candidate_count.toLocaleString();
-  $("#match-jobs").innerHTML = s.jobs.map(j => {
-    const lr = j.last_run;
-    const status = lr ? lr.status : "not run";
-    const color = status === "done" ? "#35c28c" : status === "error" ? "#ff9bb0" : status === "running" ? "#4f9cf5" : "#7e8db0";
-    const prog = lr ? lr.progress : 0;
-    const took = lr && lr.status === "done" ? ` · took ${fmtDur(lr.elapsed_seconds)}` : "";
-    return `<div class="card2 rounded-xl p-4" id="job-card-${j.job_id}">
-      <div class="flex items-center gap-2">
-        <div class="font-semibold truncate">${esc(j.job_name)}</div>
-        ${j.is_default ? '<span class="pill" style="background:#0c2c22;color:#35c28c">default</span>' : ''}
-        <span class="pill status ml-auto" style="background:#0f1830;color:${color}">${status}</span>
-      </div>
-      <div class="sub text-xs text-[#7e8db0] mt-1">${lr ? `run #${lr.id} · ${lr.n_candidates ?? '—'} candidates · top ${lr.topk}${took} · ${esc(lr.stage||'')}` : 'no runs yet'}</div>
-      <div class="bar h-2 mt-2"><div style="width:${prog}%"></div></div>
-      <div class="flex gap-2 mt-3">
-        <button onclick="runMatch(${j.job_id})" class="btn rounded-lg px-3 py-1.5 text-sm">${lr ? 'Re-run' : 'Run match'}</button>
-        ${lr && lr.status === 'done' ? `<button onclick="showResults(${lr.id})" class="btn2 rounded-lg px-3 py-1.5 text-sm">View results</button>` : ''}
-      </div>
-    </div>`;
-  }).join("");
-  s.jobs.forEach(j => { if (j.last_run && j.last_run.status === "running") pollRun(j.job_id, j.last_run.id); });
+  const m = await api("/matching/matrix");
+  const cnt = (await api("/candidate-sets")).reduce((a, s) => Math.max(a, s.kind === 'all' ? s.count : a), 0);
+  $("#m-count").textContent = cnt.toLocaleString();
+  const sets = m.candidate_sets;
+  const head = `<thead><tr><th class="text-left min-w-[180px]">Job ＼ Candidate set</th>${sets.map(s => `<th class="text-center min-w-[150px]"><div>${esc(s.name)}</div><button onclick="runCol(${s.id})" class="btn2 rounded px-2 py-0.5 text-[11px] mt-1">Run column</button></th>`).join("")}</tr></thead>`;
+  const body = m.jobs.map(j => `<tr>
+      <td><div class="font-medium">${esc(j.name)}</div><button onclick="runRow(${j.id})" class="btn2 rounded px-2 py-0.5 text-[11px] mt-1">Run row</button></td>
+      ${sets.map(s => cell(m.cells[`${j.id}_${s.id}`], j.id, s.id)).join("")}
+    </tr>`).join("");
+  $("#matrix").innerHTML = head + "<tbody>" + body + "</tbody>";
+  const active = Object.values(m.cells).some(c => c.status === "running" || c.status === "queued");
+  if (active && !pollTimer) pollTimer = setInterval(loadMatching, 1500);
+  if (!active && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   const saved = localStorage.getItem("canjob_run");
-  if (saved) { try { const r = await api("/runs/" + saved); if (r.status === "done") showResults(parseInt(saved)); } catch {} }
+  if (saved && $("#results").classList.contains("hidden")) { try { const r = await api("/runs/" + saved); if (r.status === "done") showResults(parseInt(saved)); } catch {} }
 }
-async function runMatch(jobId) {
+function cell(c, jobId, setId) {
+  if (!c) return `<td class="text-center"><button onclick="runCell(${jobId},${setId})" class="btn2 rounded px-2 py-1 text-xs">Run</button></td>`;
+  const color = c.status === "done" ? "#35c28c" : c.status === "error" ? "#ff9bb0" : "#4f9cf5";
+  const took = c.status === "done" ? ` · ${fmtDur(c.elapsed_seconds)}` : "";
+  return `<td class="text-center">
+    <div class="pill mb-1 inline-block" style="background:#0f1830;color:${color}">${c.status}${took}</div>
+    ${(c.status==='running'||c.status==='queued')?`<div class="bar h-1.5 mb-1"><div style="width:${c.progress}%"></div></div>`:''}
+    <div class="text-[10px] text-[#7e8db0] mb-1">${c.status==='done'?`top ${c.topk} · ${c.n_candidates??'—'} cand`:esc(c.stage||'')}</div>
+    <div class="flex gap-1 justify-center">
+      <button onclick="runCell(${jobId},${setId})" class="btn2 rounded px-2 py-0.5 text-[11px]">Re-run</button>
+      ${c.status==='done'?`<button onclick="showResults(${c.id})" class="btn rounded px-2 py-0.5 text-[11px]">View</button>`:''}
+    </div></td>`;
+}
+async function batch(job_ids, set_ids) {
   const topk = parseInt($("#m-topk").value) || 100;
-  const limit = parseInt($("#m-limit").value) || 0;
-  const { run_id } = await api("/runs", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ job_id: jobId, topk, limit }) });
-  toast("Run started"); pollRun(jobId, run_id);
+  await api("/runs/batch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ job_ids, candidate_set_ids: set_ids, topk }) });
+  toast(`Queued ${job_ids.length * set_ids.length} run(s)`); loadMatching();
 }
-function pollRun(jobId, runId) {
-  if (polling[jobId]) clearInterval(polling[jobId]);
-  polling[jobId] = setInterval(async () => {
-    let r; try { r = await api("/runs/" + runId); } catch { return; }
-    const card = $("#job-card-" + jobId); if (!card) return;
-    const bar = card.querySelector(".bar > div"); if (bar) bar.style.width = r.progress + "%";
-    const pill = card.querySelector(".status");
-    if (pill) { pill.textContent = r.status; pill.style.color = r.status === "done" ? "#35c28c" : r.status === "error" ? "#ff9bb0" : "#4f9cf5"; }
-    const sub = card.querySelector(".sub");
-    if (sub) sub.textContent = `run #${r.id} · ${r.n_candidates ?? '—'} candidates · top ${r.topk} · ${r.stage || ''} · ${fmtDur(r.elapsed_seconds)}`;
-    if (r.status === "done" || r.status === "error") { clearInterval(polling[jobId]); delete polling[jobId]; loadMatching(); if (r.status === 'done') showResults(r.id); }
-  }, 1000);
-}
+async function runCell(j, s) { batch([j], [s]); }
+async function runRow(j) { const m = await api("/matching/matrix"); batch([j], m.candidate_sets.map(x => x.id)); }
+async function runCol(s) { const m = await api("/matching/matrix"); batch(m.jobs.map(x => x.id), [s]); }
+async function runAll() { const m = await api("/matching/matrix"); if (m.jobs.length * m.candidate_sets.length > 40) return toast("Too many combinations (max 40)"); batch(m.jobs.map(x => x.id), m.candidate_sets.map(x => x.id)); }
+function closeResults() { localStorage.removeItem("canjob_run"); $("#results").classList.add("hidden"); }
 async function showResults(runId) {
   localStorage.setItem("canjob_run", runId);
-  let run, rows;
-  try { run = await api("/runs/" + runId); rows = await api(`/runs/${runId}/results`); } catch { return; }
-  $("#results-meta").textContent = `run #${runId} · ${rows.length} candidates · ${run.n_candidates ?? '—'} in pool · took ${fmtDur(run.elapsed_seconds)}`;
+  let run, rows; try { run = await api("/runs/" + runId); rows = await api(`/runs/${runId}/results`); } catch { return; }
+  $("#results-meta").textContent = `${run.job_name||''} × ${run.set_name||''} · ${rows.length} ranked · ${run.n_candidates ?? '—'} in pool · took ${fmtDur(run.elapsed_seconds)}`;
+  $("#res-csv").href = `/api/export/run/${runId}.csv`; $("#res-pdf").href = `/api/export/run/${runId}.pdf`;
   $("#results-body").innerHTML = rows.map(r => `
     <tr class="click" onclick='viewCandidate("${esc(r.candidate_id)}")'>
-      <td class="accent font-bold">${r.rank}</td>
-      <td class="font-mono text-xs accent2">${esc(r.candidate_id)}</td>
+      <td class="accent font-bold">${r.rank}</td><td class="font-mono text-xs accent2">${esc(r.candidate_id)}</td>
       <td><span class="pill" style="background:#0f1830;color:#35c28c">${r.score.toFixed(4)}</span></td>
       <td class="text-[#c7d2e8] text-xs leading-relaxed">${esc(r.reasoning)}</td></tr>`).join("");
   $("#results").classList.remove("hidden");
 }
 
-// ---- init (supports ?tab= & ?run= deep links) ----
 (async () => {
   const q = new URLSearchParams(location.search);
-  const tab = q.get("tab") || "jobs";
   if (q.get("run")) localStorage.setItem("canjob_run", q.get("run"));
-  await showTab(tab);
+  await showTab(q.get("tab") || "jobs");
 })();
 </script>
 </body>

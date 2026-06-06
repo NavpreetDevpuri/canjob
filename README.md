@@ -102,7 +102,7 @@ The image installs only core deps (no torch) and copies the committed semantic a
 
 A small FastAPI backend and a single-page UI (`app/`) wrap the exact same ranking engine so you can drive it from a browser.
 
-![CanJob web UI: matching view with the full 100k pool ranked and evidence-based reasoning](docs/ui_screenshot.png)
+![CanJob web UI: the jobs x candidate-sets matching matrix with per-cell timing, and a ranked run with CSV/PDF export](docs/ui_screenshot.png)
 
 ```bash
 pip install -r requirements.txt -r requirements-app.txt
@@ -113,9 +113,10 @@ python app/server.py          # open http://127.0.0.1:8000
 
 Three tabs, one page:
 
-- **Jobs** - the released JD is pre-loaded as the default job and rendered as markdown. Add or remove ad-hoc jobs by pasting a JD (ad-hoc jobs are ranked from their JD text; the default job uses the tuned config + precomputed semantic scores).
-- **Candidates** - the candidate pool is pre-loaded into the backend, searchable and paginated; add or remove candidates.
-- **Matching** - run (or re-run) a match for any job over the pool with a live progress bar. Progress is stored server-side, so it keeps updating across refreshes. Each finished run shows the top-K table with 0-1 fit scores and the same evidence-based reasoning, and the per-job cards show which jobs have been executed and over how many candidates.
+- **Jobs** - the released JD is pre-loaded as the default job and rendered as markdown. Group jobs into **job sets**; add or remove ad-hoc jobs by pasting a JD (ad-hoc jobs are ranked from their JD text; the default job uses the tuned config + precomputed semantic scores).
+- **Candidates** - the 100k pool is pre-loaded; a few **candidate sets** are seeded (AI/ML engineers, Senior 8y+, India-based, Data & analytics, Sample, plus the full pool) so the UI stays light. Each row shows a headline preview with a hidden-character count; click a row for the full profile. Search, paginate, add/remove, tick rows and save the selection as a new set.
+- **Matching** - a **matrix of jobs x candidate sets**. Run a single cell, a whole row (job x all sets), a whole column (set x all jobs), or everything. Runs are serialized through a background worker with a live, refresh-proof progress bar; each finished cell shows timing and opens the ranked top-K (0-1 fit score + evidence reasoning).
+- **Export** - download any ranked run as **CSV** or a **print-ready PDF** (also candidates and jobs), so the ranked output can be submitted as a document.
 
 State lives in a local SQLite file (`app/canjob_app.db`, gitignored). The UI runs the identical featurize -> 3-lens score -> RRF -> honeypot-filter pipeline as `rank.py`.
 
