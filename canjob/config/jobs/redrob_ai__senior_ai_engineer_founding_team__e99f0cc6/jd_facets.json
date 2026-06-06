@@ -1,0 +1,333 @@
+{
+  "_comment": "JD broken into weighted facets, derived from job_description.docx (Senior AI Engineer, Founding Team). Each positive facet contributes weight*coverage; negative facets/penalties down-weight. All matching is keyword presence over the candidate text blob (summary + headline + career titles/descriptions + skill names). Edit weights/keywords here, not in code.",
+  "experience": {
+    "ideal_min": 6,
+    "ideal_max": 8,
+    "ok_min": 5,
+    "ok_max": 9,
+    "hard_min": 3,
+    "hard_max": 15
+  },
+  "positive_facets": [
+    {
+      "id": "retrieval_embeddings",
+      "weight": 1.0,
+      "cap": 3,
+      "keywords": [
+        "embedding",
+        "embeddings",
+        "sentence-transformers",
+        "sentence transformers",
+        "bge",
+        " e5 ",
+        "semantic search",
+        "dense retrieval",
+        "retrieval",
+        "openai embeddings"
+      ]
+    },
+    {
+      "id": "vector_db",
+      "weight": 0.9,
+      "cap": 2,
+      "keywords": [
+        "vector database",
+        "vector db",
+        "pinecone",
+        "weaviate",
+        "qdrant",
+        "milvus",
+        "faiss",
+        "opensearch",
+        "elasticsearch",
+        "pgvector",
+        "hybrid search",
+        "ann ",
+        "hnsw"
+      ]
+    },
+    {
+      "id": "ranking_recsys_search",
+      "weight": 1.0,
+      "cap": 3,
+      "keywords": [
+        "ranking",
+        "learning to rank",
+        "recommendation",
+        "recommender",
+        "recsys",
+        "search relevance",
+        "search engine",
+        "matching",
+        "personalization",
+        "information retrieval"
+      ]
+    },
+    {
+      "id": "evaluation",
+      "weight": 0.7,
+      "cap": 2,
+      "keywords": [
+        "ndcg",
+        "mrr",
+        "map@",
+        "mean average precision",
+        "a/b test",
+        "ab test",
+        "offline evaluation",
+        "evaluation framework",
+        "metrics",
+        "benchmark",
+        "precision@"
+      ]
+    },
+    {
+      "id": "nlp_ir",
+      "weight": 0.8,
+      "cap": 3,
+      "keywords": [
+        "nlp",
+        "natural language processing",
+        "transformers",
+        "bert",
+        "language model",
+        "text classification",
+        "named entity",
+        "question answering",
+        "ir "
+      ]
+    },
+    {
+      "id": "python_eng",
+      "weight": 0.35,
+      "cap": 2,
+      "keywords": [
+        "python",
+        "production",
+        "microservice",
+        "api",
+        "docker",
+        "kubernetes",
+        "ci/cd",
+        "mlops"
+      ]
+    },
+    {
+      "id": "llm_finetune",
+      "weight": 0.45,
+      "cap": 2,
+      "keywords": [
+        "fine-tuning",
+        "fine tuning",
+        "lora",
+        "qlora",
+        "peft",
+        "rag",
+        "retrieval augmented",
+        "llm",
+        "large language model"
+      ]
+    },
+    {
+      "id": "learning_to_rank",
+      "weight": 0.4,
+      "cap": 1,
+      "keywords": [
+        "xgboost",
+        "lightgbm",
+        "gradient boosting",
+        "learning-to-rank",
+        "ltr",
+        "neural ranking"
+      ]
+    },
+    {
+      "id": "hrtech_marketplace",
+      "weight": 0.3,
+      "cap": 1,
+      "keywords": [
+        "recruiting",
+        "recruitment",
+        "hr-tech",
+        "hrtech",
+        "talent",
+        "marketplace",
+        "two-sided"
+      ]
+    },
+    {
+      "id": "scale_infra",
+      "weight": 0.35,
+      "cap": 1,
+      "keywords": [
+        "distributed",
+        "at scale",
+        "large-scale",
+        "inference optimization",
+        "low latency",
+        "throughput"
+      ]
+    },
+    {
+      "id": "opensource",
+      "weight": 0.25,
+      "cap": 1,
+      "keywords": [
+        "open-source",
+        "open source",
+        "github.com",
+        "contributor",
+        "maintainer",
+        "published",
+        "paper"
+      ]
+    }
+  ],
+  "negative_facets": [
+    {
+      "id": "cv_speech_robotics",
+      "penalty": 0.5,
+      "keywords": [
+        "computer vision",
+        "image classification",
+        "object detection",
+        "opencv",
+        "segmentation",
+        "speech recognition",
+        "tts",
+        "text-to-speech",
+        "asr",
+        "robotics",
+        "slam",
+        "gans",
+        "image generation",
+        "diffusion"
+      ],
+      "rescue_facets": [
+        "nlp_ir",
+        "ranking_recsys_search",
+        "retrieval_embeddings"
+      ],
+      "_note": "Applied only when the candidate has CV/speech/robotics signal but NO NLP/IR/retrieval/ranking signal."
+    },
+    {
+      "id": "langchain_only",
+      "penalty": 0.7,
+      "keywords": [
+        "langchain",
+        "llamaindex",
+        "openai api",
+        "chatgpt",
+        "prompt engineering"
+      ],
+      "rescue_facets": [
+        "retrieval_embeddings",
+        "ranking_recsys_search",
+        "nlp_ir",
+        "learning_to_rank"
+      ],
+      "_note": "Framework-enthusiast trap: only down-weight if there is NO deeper retrieval/ranking/ML signal."
+    }
+  ],
+  "services_companies": [
+    "tcs",
+    "tata consultancy",
+    "infosys",
+    "wipro",
+    "accenture",
+    "cognizant",
+    "capgemini",
+    "mindtree",
+    "ltimindtree",
+    "tech mahindra",
+    "hcl",
+    "ibm",
+    "mphasis",
+    "hexaware",
+    "deloitte",
+    "dxc"
+  ],
+  "offdomain_titles": [
+    "marketing manager",
+    "graphic designer",
+    "accountant",
+    "sales executive",
+    "civil engineer",
+    "mechanical engineer",
+    "operations manager",
+    "content writer",
+    "customer support",
+    "hr manager",
+    "project manager",
+    "business analyst",
+    "interior designer",
+    "chef",
+    "teacher",
+    "nurse"
+  ],
+  "strong_titles": [
+    "ai engineer",
+    "machine learning engineer",
+    "ml engineer",
+    "applied scientist",
+    "applied ml",
+    "research engineer",
+    "nlp engineer",
+    "search engineer",
+    "relevance engineer",
+    "recommendation",
+    "data scientist",
+    "software engineer",
+    "mlops engineer",
+    "staff engineer",
+    "principal engineer"
+  ],
+  "preferred_locations": {
+    "best": [
+      "noida",
+      "pune"
+    ],
+    "good": [
+      "hyderabad",
+      "mumbai",
+      "delhi",
+      "gurgaon",
+      "gurugram",
+      "bengaluru",
+      "bangalore",
+      "ncr"
+    ],
+    "ok": [
+      "india"
+    ]
+  },
+  "penalty_params": {
+    "keyword_stuffer": 0.3,
+    "services_all": 0.6,
+    "title_chaser": 0.8,
+    "title_chaser_min_roles": 4,
+    "title_chaser_max_avg_tenure_months": 18,
+    "stale_months": 4
+  },
+  "weights": {
+    "facets": 0.45,
+    "experience": 0.18,
+    "title": 0.15,
+    "product": 0.14,
+    "location": 0.08
+  },
+  "facet_queries": {
+    "retrieval": "embeddings sentence-transformers semantic search dense retrieval vector database faiss qdrant pinecone weaviate milvus opensearch hybrid search",
+    "ranking_eval": "learning to rank recommendation system ranking relevance search ndcg mrr map mean average precision a/b testing offline online evaluation",
+    "product_llm": "production machine learning model deployment mlops python fine-tuning lora qlora peft rag llm large scale inference"
+  },
+  "ensemble_weights": {
+    "_comment": "RRF fusion weights. deterministic (JD-faithful rules) leads; lexical recall blocks add coverage. embeddings is auto-set to 0.7 when the precomputed semantic artifact is present. product_llm is down-weighted: its query is generic and overlaps poorly with the JD-faithful order.",
+    "deterministic": 1.6,
+    "embeddings": 0.0,
+    "jd_tfidf": 0.6,
+    "retrieval": 0.55,
+    "ranking_eval": 0.5,
+    "product_llm": 0.0
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "company": "Redrob AI",
+  "title": "Senior AI Engineer (Founding Team)",
+  "location": "Pune/Noida, India (Hybrid)",
+  "experience_band": "5-9 years (ideal 6-8)",
+  "job_key": "redrob_ai__senior_ai_engineer_founding_team__e99f0cc6",
+  "job_hash_algo": "sha256(job.txt)[:8]",
+  "source": "India_runs_data_and_ai_challenge/job_description.docx",
+  "note": "job_key = slug(company)__slug(title)__hash8(job.txt). Bump only when job.txt changes."
+}
