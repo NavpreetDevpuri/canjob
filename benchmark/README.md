@@ -47,6 +47,16 @@ python benchmark/run_benchmark.py            # downloads the dataset once, then 
 | **embeddings (MiniLM)** | **0.688** | **0.823** | **0.642** | **0.621** |
 | ensemble (RRF, semantic-led) | 0.669 | 0.815 | 0.633 | 0.614 |
 
+**How to read the numbers** (all 0–1, higher = better; the `random floor` is the score
+from shuffling the candidates, so the gap above it is the real skill):
+
+- **NDCG@10 / NDCG@50** — is the top 10 / top 50 in the right order, best-fit first? 1.0 = perfect.
+- **MAP** — overall ordering quality across *all* the good-fit candidates.
+- **P@10** — fraction of our top 10 that are genuine "Good Fit" (0.62 ≈ 6 of 10, vs ~5.3 by chance).
+
+These pools are ~50% good-fit, so even a random shuffle scores ~0.55; that is why the
+absolute numbers look high and the meaningful signal is the consistent lift over the floor.
+
 **Takeaways**
 
 - Every learned lens beats the random floor on data we never saw or tuned on:
