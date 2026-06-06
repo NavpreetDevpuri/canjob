@@ -1,0 +1,15 @@
+output/
+**/__pycache__/
+*.pyc
+.git/
+.gitignore
+*.md
+run.sh
+run.bat
+requirements-embeddings.txt
+environment.yml
+demo_colab.ipynb
+submission*.csv
+token.json
+sample/
+docs/
