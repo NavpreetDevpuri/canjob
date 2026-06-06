@@ -39,8 +39,24 @@ def get_conn() -> sqlite3.Connection:
     return conn
 
 
+_TS = "%Y-%m-%d %H:%M:%S"
+
+
 def _now() -> str:
-    return time.strftime("%Y-%m-%d %H:%M:%S")
+    return time.strftime(_TS)
+
+
+def _with_elapsed(run: Dict[str, Any]) -> Dict[str, Any]:
+    """Add elapsed_seconds to a run dict (created->finished, or created->now if live)."""
+    start = run.get("created_at")
+    end = run.get("finished_at") or _now()
+    try:
+        a = time.mktime(time.strptime(start, _TS))
+        b = time.mktime(time.strptime(end, _TS))
+        run["elapsed_seconds"] = max(0, round(b - a))
+    except (TypeError, ValueError):
+        run["elapsed_seconds"] = None
+    return run
 
 
 def init_db() -> None:
@@ -236,6 +252,30 @@ def add_candidate(payload: Dict[str, Any]) -> str:
     return cid
 
 
+def candidate_detail(candidate_id: str) -> Optional[Dict[str, Any]]:
+    """Full profile for one candidate: UI-added rows from the DB, base rows from the
+    source jsonl (fast substring scan, parse only the matching line)."""
+    conn = get_conn()
+    row = conn.execute(
+        "SELECT added, raw_json FROM candidates WHERE candidate_id=? AND removed=0",
+        (candidate_id,),
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    if row["added"] and row["raw_json"]:
+        return json.loads(row["raw_json"])
+    src = candidates_source()
+    needle = f'"{candidate_id}"'
+    with open(src, encoding="utf-8") as f:
+        for line in f:
+            if needle in line:
+                c = json.loads(line)
+                if c.get("candidate_id") == candidate_id:
+                    return c
+    return None
+
+
 def remove_candidate(candidate_id: str) -> None:
     conn = get_conn()
     # UI-added rows are deleted outright; base rows are soft-removed (excluded from runs)
@@ -297,7 +337,7 @@ def get_run(run_id: int) -> Optional[Dict[str, Any]]:
     conn = get_conn()
     r = conn.execute("SELECT * FROM runs WHERE id=?", (run_id,)).fetchone()
     conn.close()
-    return dict(r) if r else None
+    return _with_elapsed(dict(r)) if r else None
 
 
 def list_runs(job_id: Optional[int] = None) -> List[Dict[str, Any]]:
@@ -307,7 +347,7 @@ def list_runs(job_id: Optional[int] = None) -> List[Dict[str, Any]]:
     else:
         rows = conn.execute("SELECT * FROM runs ORDER BY id DESC").fetchall()
     conn.close()
-    return [dict(r) for r in rows]
+    return [_with_elapsed(dict(r)) for r in rows]
 
 
 def get_results(run_id: int) -> List[Dict[str, Any]]:
@@ -332,7 +372,7 @@ def matching_summary() -> List[Dict[str, Any]]:
             "job_id": j["id"],
             "job_name": j["name"],
             "is_default": j["is_default"],
-            "last_run": dict(last) if last else None,
+            "last_run": _with_elapsed(dict(last)) if last else None,
         })
     conn.close()
     return out

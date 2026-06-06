@@ -84,6 +84,14 @@ def api_candidates(offset: int = 0, limit: int = 25, q: str = ""):
     return db.list_candidates(offset=offset, limit=min(limit, 200), q=q)
 
 
+@app.get("/api/candidates/{candidate_id}")
+def api_candidate_detail(candidate_id: str):
+    c = db.candidate_detail(candidate_id)
+    if not c:
+        raise HTTPException(404, "candidate not found")
+    return c
+
+
 @app.post("/api/candidates")
 def api_add_candidate(body: CandidateIn):
     cid = db.add_candidate(body.model_dump())

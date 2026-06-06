@@ -2,6 +2,14 @@
 
 A local, offline, CPU-only ranking system for the Redrob hackathon. It ranks the top 100 candidates from `candidates.jsonl` against the released job description, with an evidence-based reasoning for every pick. No network and no LLM API at rank time.
 
+**The name.** *CanJob* = **candidate → job**: the whole system exists to map candidates onto a job (intelligent candidate discovery and ranking). It also reads as "can-job", i.e. who can actually do this job, which is exactly what the JD asks us to figure out beyond keyword matching.
+
+**Links**
+
+- Code: https://github.com/NavpreetDevpuri/canjob
+- Colab sandbox (run it in the browser): https://colab.research.google.com/github/NavpreetDevpuri/canjob/blob/main/demo_colab.ipynb
+- Approach presentation (Google Slides): https://docs.google.com/presentation/d/1Iv0IG5LeATLk4ZPGnrk7dEI11eTv76IOFBPkb0CpE2I/edit (also committed as `docs/canjob_idea_submission.pdf`)
+
 ## Reproduce the submission (single command)
 
 ```bash
@@ -93,6 +101,8 @@ The image installs only core deps (no torch) and copies the committed semantic a
 ## Web UI (bonus)
 
 A small FastAPI backend and a single-page UI (`app/`) wrap the exact same ranking engine so you can drive it from a browser.
+
+![CanJob web UI: matching view with the full 100k pool ranked and evidence-based reasoning](docs/ui_screenshot.png)
 
 ```bash
 pip install -r requirements.txt -r requirements-app.txt
