@@ -102,7 +102,7 @@ The image installs only core deps (no torch) and copies the committed semantic a
 
 A small FastAPI backend and a single-page UI (`app/`) wrap the exact same ranking engine so you can drive it from a browser.
 
-![CanJob web UI: the jobs x candidate-sets matching matrix with per-cell timing, and a ranked run with CSV/PDF export](docs/ui_screenshot.png)
+![CanJob web UI: pick job(s) and candidate set(s) in a Run-match popup, see a filterable list of runs with timing, and open a paginated ranked run with CSV/PDF export](docs/ui_screenshot.png)
 
 ```bash
 pip install -r requirements.txt -r requirements-app.txt
@@ -113,10 +113,10 @@ python app/server.py          # open http://127.0.0.1:8000
 
 Three tabs, one page:
 
-- **Jobs** - the released JD is pre-loaded as the default job and rendered as markdown. Group jobs into **job sets**; add or remove ad-hoc jobs by pasting a JD (ad-hoc jobs are ranked from their JD text; the default job uses the tuned config + precomputed semantic scores).
-- **Candidates** - the 100k pool is pre-loaded; a few **candidate sets** are seeded (AI/ML engineers, Senior 8y+, India-based, Data & analytics, Sample, plus the full pool) so the UI stays light. Each row shows a headline preview with a hidden-character count; click a row for the full profile. Search, paginate, add/remove, tick rows and save the selection as a new set.
-- **Matching** - a **matrix of jobs x candidate sets**. Run a single cell, a whole row (job x all sets), a whole column (set x all jobs), or everything. Runs are serialized through a background worker with a live, refresh-proof progress bar; each finished cell shows timing and opens the ranked top-K (0-1 fit score + evidence reasoning).
-- **Export** - download any ranked run as **CSV** or a **print-ready PDF** (also candidates and jobs), so the ranked output can be submitted as a document.
+- **Jobs** - the released JD is pre-loaded as the default job and rendered as markdown. Group jobs into **job sets**; add or remove ad-hoc jobs by pasting a JD (ad-hoc jobs are ranked from their JD text; the default job uses the tuned config + precomputed semantic scores). **Import** jobs from a CSV (`name,jd_markdown`) and **export** to CSV/PDF.
+- **Candidates** - the 100k pool is pre-loaded; a few **candidate sets** are seeded (AI/ML engineers, Senior 8y+, India-based, Data & analytics, Sample, plus the full pool) so the UI stays light. Each row shows a headline preview with a hidden-character count; click a row for the full profile. Search, paginate, add/remove, tick rows and save the selection as a new set. **Import** candidates from a CSV (`candidate_id,title,yoe,location,headline`, the same shape as the export); a malformed header raises a clear error.
+- **Matching** - a **Run-match popup** where you tick the **job(s)** and the **candidate set(s)** you want; it queues every selected job x set combination (matching is set-level, not per-candidate, to stay simple). Runs are serialized through a background worker with a live, refresh-proof progress bar and listed in a **filterable runs table** (filter by job or by candidate set). Each finished run shows timing and opens the ranked top-K, **paginated 100 per page** (0-1 fit score + evidence reasoning).
+- **Export / import** - download any ranked run as **CSV** or a **print-ready PDF** (also candidates and jobs); import jobs and candidates from CSV with format validation. The ranked output can be submitted as a document straight from the UI.
 
 State lives in a local SQLite file (`app/canjob_app.db`, gitignored). The UI runs the identical featurize -> 3-lens score -> RRF -> honeypot-filter pipeline as `rank.py`.
 
@@ -142,3 +142,7 @@ submission_metadata.yaml
 ## Output
 
 `submission.csv`: exactly 100 rows, UTF-8, columns `candidate_id,rank,score,reasoning`, scores non-increasing, ranks 1..100 unique, validated by `validate_submission.py`. The reasoning cites concrete evidence (named skills with proficiency and months, product vs services employers, evaluation terms found in the candidate's own writing) mapped to JD requirements, with honest concerns where they exist.
+
+## Credits & AI usage
+
+The ideas and design here are mine (the developer): the three-lens ensemble (rules + lexical + semantic) fused with RRF, modelling the JD as per-job config, the high-precision honeypot logic, the offline precompute / in-budget rank split, reusing a local search engine, and the whole web-UI design (sets, the run-match flow, exports). I used **Cursor** (an AI coding assistant) to turn those ideas into code quickly, refactor, and write the boilerplate. No candidate data is sent to any hosted LLM and the ranking step makes zero LLM/API calls; the only model used anywhere is the local MiniLM in the offline pre-computation. In short: the architecture and decisions are human; the typing was accelerated with AI.

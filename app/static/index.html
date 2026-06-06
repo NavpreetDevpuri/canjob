@@ -62,6 +62,7 @@
         <h2 class="font-semibold" id="jobs-title">Jobs</h2>
         <div class="ml-auto flex gap-2">
           <button onclick="openAddJob()" class="btn rounded-lg px-3 py-1.5 text-sm">+ Add job</button>
+          <button onclick="triggerImport('jobs')" class="btn2 rounded-lg px-3 py-1.5 text-sm">Import CSV</button>
           <a id="jobs-csv" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export CSV</a>
           <a id="jobs-pdf" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export PDF</a>
         </div>
@@ -86,6 +87,7 @@
         <input id="c-search" class="rounded-lg px-3 py-1.5 text-sm w-56" placeholder="Search id / title / location / headline…" oninput="debouncedSearch()" />
         <div class="ml-auto flex gap-2">
           <button onclick="openAddCandidate()" class="btn rounded-lg px-3 py-1.5 text-sm">+ Add</button>
+          <button onclick="triggerImport('candidates')" class="btn2 rounded-lg px-3 py-1.5 text-sm">Import CSV</button>
           <a id="cand-csv" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export CSV</a>
           <a id="cand-pdf" class="btn2 rounded-lg px-3 py-1.5 text-sm" href="#">Export PDF</a>
         </div>
@@ -107,14 +109,20 @@
 
   <!-- MATCHING -->
   <section id="view-matching" class="hidden">
-    <div class="card rounded-xl p-4 mb-5 flex flex-wrap items-end gap-5">
-      <div><div class="text-xs text-[#7e8db0]">Pool</div><div id="m-count" class="text-2xl font-bold accent">—</div></div>
-      <div><label class="text-xs text-[#7e8db0] block">Top K</label><input id="m-topk" type="number" value="100" class="rounded-lg px-3 py-1.5 text-sm w-24" /></div>
-      <button onclick="runAll()" class="btn rounded-lg px-4 py-2 text-sm">Run all combinations</button>
-      <p class="text-xs text-[#7e8db0] flex-1 min-w-[260px]">Matrix of <b>jobs × candidate sets</b>. Run a single cell, a whole row (job × all sets), a whole column (set × all jobs), or everything. Status persists across refreshes.</p>
+    <div class="card rounded-xl p-4 mb-5 flex flex-wrap items-center gap-4">
+      <div><div class="text-xs text-[#7e8db0]">Pool</div><div id="m-count" class="text-xl font-bold accent">—</div></div>
+      <button onclick="openRunModal()" class="btn rounded-lg px-4 py-2 text-sm">Run match…</button>
+      <div class="ml-auto flex gap-3 items-end flex-wrap">
+        <div><label class="text-xs text-[#7e8db0] block">Filter by job</label><select id="f-job" class="rounded-lg px-3 py-1.5 text-sm" onchange="renderRuns()"></select></div>
+        <div><label class="text-xs text-[#7e8db0] block">Filter by candidate set</label><select id="f-set" class="rounded-lg px-3 py-1.5 text-sm" onchange="renderRuns()"></select></div>
+      </div>
     </div>
-    <div class="card rounded-xl p-4 overflow-x-auto">
-      <table id="matrix"></table>
+    <div class="card rounded-xl p-4">
+      <h2 class="font-semibold mb-3">Runs <span id="runs-count" class="text-xs text-[#7e8db0]"></span></h2>
+      <div class="overflow-x-auto"><table>
+        <thead><tr><th>Job</th><th>Candidate set</th><th>Status</th><th>Pool</th><th>Top K</th><th>Took</th><th class="text-right">Actions</th></tr></thead>
+        <tbody id="runs-body"></tbody>
+      </table></div>
     </div>
 
     <div id="results" class="card rounded-xl p-5 mt-5 hidden">
@@ -130,6 +138,12 @@
         <thead><tr><th class="w-12">#</th><th>Candidate</th><th class="w-24">Score</th><th>Reasoning</th></tr></thead>
         <tbody id="results-body"></tbody>
       </table></div>
+      <div class="flex items-center gap-3 mt-3 text-sm">
+        <button onclick="resPage(-1)" class="btn2 rounded-lg px-3 py-1">Prev</button>
+        <span id="res-page" class="text-[#9fb0d0]"></span>
+        <button onclick="resPage(1)" class="btn2 rounded-lg px-3 py-1">Next</button>
+        <span class="text-[#7e8db0] text-xs ml-2">100 per page · click a row for the full profile</span>
+      </div>
     </div>
   </section>
 </main>
@@ -137,6 +151,7 @@
 <div id="modal" class="fixed inset-0 z-30 hidden items-start justify-center modal-bg overflow-y-auto py-10" onclick="if(event.target===this)closeModal()">
   <div id="modal-card" class="card rounded-2xl w-[92%] max-w-4xl mx-auto p-6 shadow-2xl"></div>
 </div>
+<input type="file" id="csvfile" accept=".csv,text/csv" class="hidden" onchange="handleImport(event)">
 <div id="toast" class="fixed bottom-5 right-5 card2 rounded-lg px-4 py-2 text-sm hidden z-40"></div>
 
 <script>
@@ -153,6 +168,22 @@ function fmtDur(s) { if (s == null) return "—"; if (s < 60) return s + "s"; co
 function openModal(h) { $("#modal-card").innerHTML = h; $("#modal").classList.remove("hidden"); $("#modal").classList.add("flex"); }
 function closeModal() { $("#modal").classList.add("hidden"); $("#modal").classList.remove("flex"); }
 document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+// ---- CSV import ----
+let importKind = null;
+function triggerImport(kind) { importKind = kind; const f = $("#csvfile"); f.value = ""; f.click(); }
+async function handleImport(e) {
+  const f = e.target.files[0]; if (!f) return;
+  const content = await f.text();
+  let set_ids = [];
+  if (importKind === "candidates") set_ids = (curCandSet && candSets.find(s => s.id === curCandSet)?.kind !== "all") ? [curCandSet] : [];
+  if (importKind === "jobs") set_ids = curJobSet ? [curJobSet] : [];
+  try {
+    const r = await api(`/import/${importKind}`, { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ content, set_ids }) });
+    toast(`Imported ${r.imported} ${importKind}`);
+    importKind === "candidates" ? loadCandidatesTab() : loadJobsTab();
+  } catch (err) { let m = err.message; try { m = JSON.parse(m).detail || m; } catch {} alert("Import failed: " + m); }
+}
 
 document.querySelectorAll(".tab").forEach(b => b.onclick = () => showTab(b.dataset.tab));
 async function showTab(name) {
@@ -318,64 +349,109 @@ async function viewCandidate(id) {
 }
 
 // ============================== MATCHING ==================================
-let pollTimer = null;
+let pollTimer = null, matrixData = { jobs: [], candidate_sets: [], cells: {} };
 async function loadMatching() {
-  const m = await api("/matching/matrix");
-  const cnt = (await api("/candidate-sets")).reduce((a, s) => Math.max(a, s.kind === 'all' ? s.count : a), 0);
+  matrixData = await api("/matching/matrix");
+  const cnt = matrixData.candidate_sets.find(s => s.kind === 'all')?.count || 0;
   $("#m-count").textContent = cnt.toLocaleString();
-  const sets = m.candidate_sets;
-  const head = `<thead><tr><th class="text-left min-w-[180px]">Job ＼ Candidate set</th>${sets.map(s => `<th class="text-center min-w-[150px]"><div>${esc(s.name)}</div><button onclick="runCol(${s.id})" class="btn2 rounded px-2 py-0.5 text-[11px] mt-1">Run column</button></th>`).join("")}</tr></thead>`;
-  const body = m.jobs.map(j => `<tr>
-      <td><div class="font-medium">${esc(j.name)}</div><button onclick="runRow(${j.id})" class="btn2 rounded px-2 py-0.5 text-[11px] mt-1">Run row</button></td>
-      ${sets.map(s => cell(m.cells[`${j.id}_${s.id}`], j.id, s.id)).join("")}
-    </tr>`).join("");
-  $("#matrix").innerHTML = head + "<tbody>" + body + "</tbody>";
-  const active = Object.values(m.cells).some(c => c.status === "running" || c.status === "queued");
+  fillFilter("#f-job", "All jobs", matrixData.jobs);
+  fillFilter("#f-set", "All candidate sets", matrixData.candidate_sets);
+  renderRuns();
+  const active = Object.values(matrixData.cells).some(c => c.status === "running" || c.status === "queued");
   if (active && !pollTimer) pollTimer = setInterval(loadMatching, 1500);
   if (!active && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
   const saved = localStorage.getItem("canjob_run");
   if (saved && $("#results").classList.contains("hidden")) { try { const r = await api("/runs/" + saved); if (r.status === "done") showResults(parseInt(saved)); } catch {} }
 }
-function cell(c, jobId, setId) {
-  if (!c) return `<td class="text-center"><button onclick="runCell(${jobId},${setId})" class="btn2 rounded px-2 py-1 text-xs">Run</button></td>`;
-  const color = c.status === "done" ? "#35c28c" : c.status === "error" ? "#ff9bb0" : "#4f9cf5";
-  const took = c.status === "done" ? ` · ${fmtDur(c.elapsed_seconds)}` : "";
-  return `<td class="text-center">
-    <div class="pill mb-1 inline-block" style="background:#0f1830;color:${color}">${c.status}${took}</div>
-    ${(c.status==='running'||c.status==='queued')?`<div class="bar h-1.5 mb-1"><div style="width:${c.progress}%"></div></div>`:''}
-    <div class="text-[10px] text-[#7e8db0] mb-1">${c.status==='done'?`top ${c.topk} · ${c.n_candidates??'—'} cand`:esc(c.stage||'')}</div>
-    <div class="flex gap-1 justify-center">
-      <button onclick="runCell(${jobId},${setId})" class="btn2 rounded px-2 py-0.5 text-[11px]">Re-run</button>
-      ${c.status==='done'?`<button onclick="showResults(${c.id})" class="btn rounded px-2 py-0.5 text-[11px]">View</button>`:''}
-    </div></td>`;
+function fillFilter(sel, allLabel, items) {
+  const el = $(sel), cur = el.value;
+  el.innerHTML = `<option value="all">${allLabel}</option>` + items.map(i => `<option value="${i.id}">${esc(i.name)}</option>`).join("");
+  if (cur) el.value = cur;
+}
+function renderRuns() {
+  const fj = $("#f-job").value, fs = $("#f-set").value;
+  const jobName = id => matrixData.jobs.find(j => j.id === id)?.name || id;
+  const setName = id => matrixData.candidate_sets.find(s => s.id === id)?.name || id;
+  let rows = Object.entries(matrixData.cells).map(([k, c]) => {
+    const [jid, sid] = k.split("_").map(Number);
+    return { jid, sid, c };
+  });
+  if (fj !== "all") rows = rows.filter(r => r.jid === parseInt(fj));
+  if (fs !== "all") rows = rows.filter(r => r.sid === parseInt(fs));
+  rows.sort((a, b) => b.c.id - a.c.id);
+  $("#runs-count").textContent = `(${rows.length})`;
+  $("#runs-body").innerHTML = rows.map(({ jid, sid, c }) => {
+    const color = c.status === "done" ? "#35c28c" : c.status === "error" ? "#ff9bb0" : "#4f9cf5";
+    return `<tr>
+      <td class="font-medium">${esc(jobName(jid))}</td>
+      <td>${esc(setName(sid))}</td>
+      <td><span class="pill" style="background:#0f1830;color:${color}">${c.status}</span>
+          ${(c.status==='running'||c.status==='queued')?`<div class="bar h-1.5 mt-1 w-24"><div style="width:${c.progress}%"></div></div><div class="text-[10px] text-[#7e8db0] mt-0.5">${esc(c.stage||'')}</div>`:''}</td>
+      <td>${c.n_candidates ?? '—'}</td><td>${c.topk}</td><td class="text-[#9fb0d0]">${c.status==='done'?fmtDur(c.elapsed_seconds):'—'}</td>
+      <td class="text-right whitespace-nowrap">
+        ${c.status==='done'?`<button onclick="showResults(${c.id})" class="btn rounded px-2 py-1 text-xs">View</button>
+          <a href="/api/export/run/${c.id}.csv" class="btn2 rounded px-2 py-1 text-xs ml-1">CSV</a>
+          <a href="/api/export/run/${c.id}.pdf" class="btn2 rounded px-2 py-1 text-xs ml-1">PDF</a>`:''}
+        <button onclick="batch([${jid}],[${sid}])" class="btn2 rounded px-2 py-1 text-xs ml-1">Re-run</button>
+      </td></tr>`;
+  }).join("") || `<tr><td colspan="7" class="text-[#7e8db0] text-sm">No runs yet. Click “Run match…”.</td></tr>`;
+}
+function openRunModal() {
+  const csets = matrixData.candidate_sets, jobs = matrixData.jobs;
+  const cb = (cls, i, checked) => `<label class="flex items-center gap-2 text-sm py-1"><input type="checkbox" class="${cls}" value="${i.id}" ${checked?'checked':''}> ${esc(i.name)}${i.count!==undefined?` <span class="text-[#7e8db0] text-xs">(${i.count.toLocaleString()})</span>`:''}</label>`;
+  openModal(`
+    <div class="flex items-center mb-4"><h3 class="text-lg font-semibold">Run a match</h3><button onclick="closeModal()" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
+    <div class="flex items-end gap-3 mb-4"><div><label class="text-xs text-[#9fb0d0] block">Top K</label><input id="run-topk" type="number" value="100" class="rounded-lg px-3 py-2 text-sm w-28"></div>
+      <p class="text-xs text-[#7e8db0] flex-1">Runs every selected <b>job</b> against every selected <b>candidate set</b> (max 40 combinations).</p></div>
+    <div class="grid grid-cols-2 gap-5">
+      <div><div class="flex items-center mb-1"><span class="text-xs uppercase tracking-wide accent2">Candidate sets</span><button onclick="selAll('run-set')" class="btn2 ml-auto rounded px-2 py-0.5 text-[11px]">All</button></div>
+        <div class="max-h-60 overflow-y-auto pr-1">${csets.map(s => cb('run-set', s, s.is_default)).join("")}</div></div>
+      <div><div class="flex items-center mb-1"><span class="text-xs uppercase tracking-wide accent">Jobs</span><button onclick="selAll('run-job')" class="btn2 ml-auto rounded px-2 py-0.5 text-[11px]">All</button></div>
+        <div class="max-h-60 overflow-y-auto pr-1">${jobs.map(j => cb('run-job', j, j.is_default)).join("")}</div></div>
+    </div>
+    <button onclick="runSelected()" class="btn w-full rounded-lg py-2.5 mt-5 text-sm">Run selected combinations</button>`);
+}
+function selAll(cls) { const all = [...document.querySelectorAll("." + cls)]; const on = all.some(c => !c.checked); all.forEach(c => c.checked = on); }
+async function runSelected() {
+  const jobs = [...document.querySelectorAll(".run-job:checked")].map(c => parseInt(c.value));
+  const sets = [...document.querySelectorAll(".run-set:checked")].map(c => parseInt(c.value));
+  if (!jobs.length || !sets.length) return toast("Pick at least one job and one candidate set");
+  if (jobs.length * sets.length > 40) return toast("Too many combinations (max 40)");
+  const topk = parseInt($("#run-topk").value) || 100;
+  await api("/runs/batch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ job_ids: jobs, candidate_set_ids: sets, topk }) });
+  closeModal(); toast(`Queued ${jobs.length * sets.length} run(s)`); loadMatching();
 }
 async function batch(job_ids, set_ids) {
-  const topk = parseInt($("#m-topk").value) || 100;
-  await api("/runs/batch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ job_ids, candidate_set_ids: set_ids, topk }) });
-  toast(`Queued ${job_ids.length * set_ids.length} run(s)`); loadMatching();
+  await api("/runs/batch", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ job_ids, candidate_set_ids: set_ids, topk: 100 }) });
+  toast("Re-run queued"); loadMatching();
 }
-async function runCell(j, s) { batch([j], [s]); }
-async function runRow(j) { const m = await api("/matching/matrix"); batch([j], m.candidate_sets.map(x => x.id)); }
-async function runCol(s) { const m = await api("/matching/matrix"); batch(m.jobs.map(x => x.id), [s]); }
-async function runAll() { const m = await api("/matching/matrix"); if (m.jobs.length * m.candidate_sets.length > 40) return toast("Too many combinations (max 40)"); batch(m.jobs.map(x => x.id), m.candidate_sets.map(x => x.id)); }
+let resRows = [], resPageN = 0, resRun = null; const RES_PER = 100;
 function closeResults() { localStorage.removeItem("canjob_run"); $("#results").classList.add("hidden"); }
 async function showResults(runId) {
   localStorage.setItem("canjob_run", runId);
-  let run, rows; try { run = await api("/runs/" + runId); rows = await api(`/runs/${runId}/results`); } catch { return; }
-  $("#results-meta").textContent = `${run.job_name||''} × ${run.set_name||''} · ${rows.length} ranked · ${run.n_candidates ?? '—'} in pool · took ${fmtDur(run.elapsed_seconds)}`;
+  try { resRun = await api("/runs/" + runId); resRows = await api(`/runs/${runId}/results`); } catch { return; }
+  resPageN = 0;
   $("#res-csv").href = `/api/export/run/${runId}.csv`; $("#res-pdf").href = `/api/export/run/${runId}.pdf`;
-  $("#results-body").innerHTML = rows.map(r => `
+  $("#results-meta").textContent = `${resRun.job_name||''} × ${resRun.set_name||''} · ${resRows.length} ranked · ${resRun.n_candidates ?? '—'} in pool · took ${fmtDur(resRun.elapsed_seconds)}`;
+  $("#results").classList.remove("hidden");
+  renderResPage();
+}
+function renderResPage() {
+  const start = resPageN * RES_PER, slice = resRows.slice(start, start + RES_PER);
+  $("#results-body").innerHTML = slice.map(r => `
     <tr class="click" onclick='viewCandidate("${esc(r.candidate_id)}")'>
       <td class="accent font-bold">${r.rank}</td><td class="font-mono text-xs accent2">${esc(r.candidate_id)}</td>
       <td><span class="pill" style="background:#0f1830;color:#35c28c">${r.score.toFixed(4)}</span></td>
       <td class="text-[#c7d2e8] text-xs leading-relaxed">${esc(r.reasoning)}</td></tr>`).join("");
-  $("#results").classList.remove("hidden");
+  $("#res-page").textContent = resRows.length ? `${start + 1}–${Math.min(start + RES_PER, resRows.length)} of ${resRows.length}` : "0";
 }
+function resPage(d) { const n = resPageN + d; if (n >= 0 && n * RES_PER < resRows.length) { resPageN = n; renderResPage(); } }
 
 (async () => {
   const q = new URLSearchParams(location.search);
   if (q.get("run")) localStorage.setItem("canjob_run", q.get("run"));
   await showTab(q.get("tab") || "jobs");
+  if (q.get("runmodal")) openRunModal();
 })();
 </script>
 </body>

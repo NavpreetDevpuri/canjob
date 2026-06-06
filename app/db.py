@@ -482,8 +482,18 @@ def matching_matrix() -> Dict[str, Any]:
     conn = get_conn()
     jobs = [dict(j) for j in conn.execute(
         "SELECT id, name, is_default FROM jobs ORDER BY is_default DESC, id ASC").fetchall()]
-    csets = [dict(s) for s in conn.execute(
-        "SELECT id, name, kind, is_default FROM candidate_sets ORDER BY is_default DESC, id ASC").fetchall()]
+    total_pool = conn.execute("SELECT COUNT(*) FROM candidates WHERE removed=0").fetchone()[0]
+    csets = []
+    for s in conn.execute("SELECT id, name, kind, is_default FROM candidate_sets "
+                          "ORDER BY is_default DESC, id ASC").fetchall():
+        if s["kind"] == "all":
+            cnt = total_pool
+        else:
+            cnt = conn.execute(
+                "SELECT COUNT(*) FROM candidate_set_members m JOIN candidates c "
+                "ON c.candidate_id=m.candidate_id WHERE m.set_id=? AND c.removed=0",
+                (s["id"],)).fetchone()[0]
+        csets.append({**dict(s), "count": cnt})
     cells = {}
     for r in conn.execute(
         "SELECT id, job_id, candidate_set_id, status, progress, stage, n_candidates, topk, "

@@ -6,6 +6,8 @@ Run:
 """
 from __future__ import annotations
 
+import csv as csvmod
+import io
 import itertools
 import os
 import sys
@@ -50,6 +52,21 @@ class BatchRunIn(BaseModel):
     job_ids: list[int]
     candidate_set_ids: list[int]
     topk: int = 100
+
+
+class ImportIn(BaseModel):
+    content: str
+    set_ids: list[int] = []
+
+
+def _read_csv(content: str) -> list[dict]:
+    try:
+        rows = list(csvmod.DictReader(io.StringIO(content)))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"Could not parse CSV: {e}")
+    if not rows:
+        raise HTTPException(400, "CSV has a header but no data rows.")
+    return [{(k or "").strip().lower(): (v or "").strip() for k, v in r.items()} for r in rows]
 
 
 def _csv_resp(text: str, name: str) -> Response:
@@ -216,6 +233,48 @@ def api_jobs_csv(set_id: int | None = None):
 @app.get("/api/export/jobs.pdf")
 def api_jobs_pdf(set_id: int | None = None):
     return _pdf_resp(exports.jobs_pdf(set_id), "canjob_jobs.pdf")
+
+
+# ------------------------------- imports ------------------------------------
+@app.post("/api/import/candidates")
+def api_import_candidates(body: ImportIn):
+    rows = _read_csv(body.content)
+    if "title" not in rows[0]:
+        raise HTTPException(400, "Candidate CSV must include a 'title' column. "
+                                 "Expected header: candidate_id,title,yoe,location,headline")
+    n = 0
+    for r in rows:
+        if not r.get("title"):
+            continue
+        try:
+            yoe = float(r["yoe"]) if r.get("yoe") else None
+        except ValueError:
+            yoe = None
+        db.add_candidate({
+            "candidate_id": r.get("candidate_id") or None, "title": r["title"], "yoe": yoe,
+            "location": r.get("location", ""), "skills": r.get("skills", ""),
+            "summary": r.get("summary") or r.get("headline", ""),
+        }, body.set_ids)
+        n += 1
+    return {"imported": n}
+
+
+@app.post("/api/import/jobs")
+def api_import_jobs(body: ImportIn):
+    rows = _read_csv(body.content)
+    cols = set(rows[0].keys())
+    if "name" not in cols or not ({"jd_markdown", "jd", "description"} & cols):
+        raise HTTPException(400, "Job CSV must include a 'name' column and a 'jd_markdown' "
+                                 "(or 'description') column.")
+    n = 0
+    for r in rows:
+        name = r.get("name", "")
+        jd = r.get("jd_markdown") or r.get("jd") or r.get("description") or ""
+        if not name or not jd:
+            continue
+        db.add_job(name, jd, body.set_ids)
+        n += 1
+    return {"imported": n}
 
 
 # ------------------------------- UI -----------------------------------------
