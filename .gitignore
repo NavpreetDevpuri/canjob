@@ -1,0 +1,28 @@
+# Secrets / credentials (never commit)
+token.json
+*credentials*.json
+client_secret*.json
+*.pem
+
+# Large precompute intermediate (the full embedding matrix). The small per-job
+# semantic_scores.npz under canjob/config/jobs/*/precomputed/ IS committed.
+output/
+out_docker/
+
+# Generated submission (regenerate with: python rank.py)
+submission*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
+
+# Editable presentation source (the PDF in docs/ is the committed deliverable)
+docs/*.pptx
+
+# Local notes not part of the submission
+CHALLENGE_ANALYSIS.md
