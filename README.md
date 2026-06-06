@@ -1,0 +1,113 @@
+# CanJob: Intelligent Candidate Discovery & Ranking
+
+A local, offline, CPU-only ranking system for the Redrob hackathon. It ranks the top 100 candidates from `candidates.jsonl` against the released job description, with an evidence-based reasoning for every pick. No network and no LLM API at rank time.
+
+## Reproduce the submission (single command)
+
+```bash
+# 1. install core deps (numpy, pandas, scikit-learn, orjson)
+pip install -r requirements.txt
+
+# 2. produce the ranked CSV  (CPU-only, offline, ~30s for 100k)
+python rank.py --candidates ./candidates.jsonl --out ./submission.csv
+```
+
+That is the full scoring step that produces `submission.csv`. It needs no GPU, no network, and finishes in well under the 5-minute budget. The semantic signal is read from a small artifact committed to the repo (see Pre-computation below), so no model or torch is needed here.
+
+## Compute-constraint compliance
+
+| Constraint | Limit | This system |
+|---|---|---|
+| Runtime (ranking step) | <= 5 min | ~30s local, ~50s in Docker, for the full 100k |
+| Memory | <= 16 GB | comfortably under (vectorized, single pass) |
+| Compute | CPU only | no GPU anywhere in the ranking step |
+| Network | off | ranking reads only local files (verified with `docker run --network none`) |
+| Disk | <= 5 GB | committed artifact is ~0.6 MB; optional cache ~150 MB |
+
+## How it works
+
+One vectorized pipeline (pandas, numpy, scikit-learn), no per-row Python loops.
+
+1. **Load and featurize.** Candidates are read with orjson into one tabular row each. Nested arrays (skills, career history, education, the 23 Redrob signals) are flattened with `json_normalize` plus groupby, so every later step is a column operation.
+2. **Flag honeypots.** Boolean column checks catch logically impossible profiles (for example "expert" proficiency on a skill used 0 months, a role that ends before it starts, or tenure greater than total experience). Flagged candidates are excluded from the top 100.
+3. **Score with three independent lenses**, because each catches what the others miss:
+   - **Rules**: a JD-faithful deterministic score from config (required skill facets, experience band, product vs services background, location) minus the penalties the JD spells out (keyword stuffers, CV/speech-only, framework-only, title chasers), then multiplied by a behavioral-availability modifier built from the Redrob signals.
+   - **Lexical**: several focused TF-IDF queries (retrieval, ranking/eval, full JD) for keyword recall, instead of one blurry mega-query.
+   - **Semantic**: local MiniLM embeddings that match meaning, catching the JD's "Tier-5" candidate who built a recommender at a product company but never writes "RAG" or "Pinecone". These scores are precomputed offline (below).
+4. **Merge with Reciprocal Rank Fusion (RRF).** Each lens produces a ranking; the fused score is the sum over lenses of `weight / (k + rank)`. Combining on ranks means no single lens scale can dominate. Weights live in `jd_facets.json` under `ensemble_weights`.
+5. **Rank and explain.** Honeypots are dropped, ties break by `candidate_id`, scores are non-increasing, and each row gets a reasoning string citing concrete profile evidence.
+
+## Behavioral signals (the 23 Redrob signals)
+
+The JD is explicit that a perfect-on-paper candidate who is unreachable is not actually hireable. The rules score is multiplied by a bounded availability/engagement modifier that combines: recruiter response rate, last-active recency, open-to-work, interview completion rate, offer acceptance rate, recruiter saves (demand), profile completeness, GitHub activity, verification, and notice period. Missing history (for example no prior offers) is treated as neutral, not penalized.
+
+## Honeypots
+
+The dataset hides ~80 honeypots (subtly impossible profiles), forced to relevance tier 0; >10% in the top 100 is disqualifying. We detect a high-precision set of impossible profiles and exclude them. Every run prints `Honeypots in submitted top 100: 0`, which you can verify directly. We deliberately avoid noisy checks (for example salary min>max) that fire on legitimate candidates.
+
+## Pre-computation (allowed; outside the timed window)
+
+The spec allows pre-computation as long as the step that produces the CSV stays in budget. The only heavy part is MiniLM embeddings, so we precompute them once and reduce them to a tiny per-job artifact:
+
+```bash
+pip install -r requirements.txt -r requirements-embeddings.txt   # adds torch + transformers
+python precompute.py --candidates ./candidates.jsonl
+# writes canjob/config/jobs/<job_key>/precomputed/semantic_scores.npz  (~0.6 MB, committed)
+```
+
+This artifact (candidate_id -> cosine-to-JD score) is committed to the repo, so `rank.py` and the Docker reproduction get the semantic signal with no torch and no network. The full embedding matrix is cached under `output/` (gitignored) so re-runs are fast. `rank.py` runs fine without it too (`--no-semantic` or a missing artifact falls back to the rules + lexical ensemble).
+
+## Configuration is per-job
+
+Turning a JD into config is a one-time offline step (by hand or with an LLM). Each job has its own folder so the same code serves many jobs:
+
+```
+canjob/config/jobs/<job_key>/
+    job.txt          the raw job description (the only human input)
+    jd_facets.json   JD -> weighted facets, penalties, queries, fusion weights
+    filters.json     honeypot thresholds + skill/title/location vocab
+    meta.json        company, title, hash
+    precomputed/semantic_scores.npz   committed semantic artifact
+```
+
+`job_key = slug(company)__slug(title)__hash8(job.txt)`, so every JD revision is a distinct folder. Select with `--job <key>` (auto when there is one).
+
+`jd_facets.json` holds `experience`, `positive_facets`, `negative_facets`, `services_companies`, `offdomain_titles`, `strong_titles`, `preferred_locations`, `penalty_params`, `weights`, `facet_queries`, and `ensemble_weights`. `filters.json` holds `honeypot_thresholds` and the skill/title/location vocab.
+
+## Docker (Stage-3 parity, offline)
+
+```bash
+docker build -t canjob .
+docker run --rm --network none \
+  -v "$PWD/candidates_dir:/data:ro" \
+  -v "$PWD/output:/out" \
+  canjob --candidates /data/candidates.jsonl --out /out/submission.csv
+```
+
+The image installs only core deps (no torch) and copies the committed semantic artifact, so the ranking runs fully offline and finishes in ~50s for 100k. Verified with `--network none`.
+
+## Sandbox demo
+
+`demo_colab.ipynb` is a run-all Google Colab notebook (Section 10.5 sandbox): a config panel at the top, a small bundled sample (or your own upload, or the full dataset via Drive), and an end-to-end run that prints the ranked table, a validity check, and a score chart.
+
+## Layout
+
+```
+rank.py                 single-command entrypoint (-> canjob.ranker)
+precompute.py           offline embedding precompute -> small committed artifact
+canjob/
+  ranker.py             orchestration: load -> featurize -> score -> RRF -> CSV
+  featurize.py          vectorized features, JD-aware score, honeypots, TF-IDF, RRF
+  embeddings.py         offline MiniLM (used only by precompute.py)
+  candidate_adapter.py  candidate -> SearchableDocument (search-engine path)
+  config/jobs/<key>/    per-job config + committed semantic artifact
+search_engine/          local lexical search engine (reusable reference module)
+requirements.txt / requirements-embeddings.txt / environment.yml
+Dockerfile / run.sh / run.bat / demo_colab.ipynb
+docs/canjob_idea_submission.pdf   approach presentation (what we built, why, and how)
+submission_metadata.yaml
+```
+
+## Output
+
+`submission.csv`: exactly 100 rows, UTF-8, columns `candidate_id,rank,score,reasoning`, scores non-increasing, ranks 1..100 unique, validated by `validate_submission.py`. The reasoning cites concrete evidence (named skills with proficiency and months, product vs services employers, evaluation terms found in the candidate's own writing) mapped to JD requirements, with honest concerns where they exist.

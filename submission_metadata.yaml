@@ -1,0 +1,86 @@
+# Redrob Hackathon - Submission Metadata (mirrors portal metadata)
+
+# ============================================================================
+# Team identity
+# ============================================================================
+team_name: "canjob"
+
+primary_contact:
+  name: "Navpreet Singh"
+  email: "navpreetdevpuri@gmail.com"
+  phone: "+91-XXXXXXXXXX"   # fill at upload time
+
+team_members:
+  - name: "Navpreet Singh"
+    email: "navpreetdevpuri@gmail.com"
+    role: "Solo - AI/ML Engineer"
+
+# ============================================================================
+# Code and reproducibility
+# ============================================================================
+github_repo: "https://github.com/NavpreetDevpuri/canjob"
+
+sandbox_link: "https://colab.research.google.com/github/NavpreetDevpuri/canjob/blob/main/demo_colab.ipynb"
+# Google Colab run-all notebook. Accepts a small sample (or upload / full dataset),
+# runs end-to-end on CPU, and produces a ranked CSV within the compute budget.
+
+reproduce_command: "python rank.py --candidates ./candidates.jsonl --out ./submission.csv"
+# Single command that produces submission.csv. CPU-only, offline, < 5 min for 100k.
+# Pre-computation (embeddings) is done separately by precompute.py and its small
+# output artifact is committed, so this command needs no torch and no network.
+
+# ============================================================================
+# Compute environment
+# ============================================================================
+compute:
+  platform: "MacBook Pro (Apple M3 Pro)"
+  cpu_cores: 11
+  ram_gb: 18
+  python_version: "3.12.8"
+  os: "macOS 26.2"
+  uses_gpu_for_inference: false
+  has_network_during_ranking: false
+  pre_computation_required: true
+  pre_computation_time_minutes: 10
+  # Also verified inside Docker (python:3.12-slim) with `docker run --network none`
+  # (~50s for 100k), and on Google Colab free CPU.
+
+# ============================================================================
+# AI tools declaration
+# ============================================================================
+ai_tools_used:
+  - "Cursor"
+
+ai_usage_summary: |
+  Cursor was used throughout as the development environment: brainstorming the
+  approach, drafting and refactoring code, and iterating on the JD-to-config
+  modeling. All engineering decisions (the JD-faithful scoring model, honeypot
+  rules, the precompute/rank split for compute compliance, the ensemble) were
+  human-directed and reviewed. No candidate data was sent to any hosted LLM, and
+  the ranking step makes no LLM/API calls.
+
+# ============================================================================
+# Approach summary
+# ============================================================================
+methodology_summary: |
+  A JD-faithful, CPU-only ensemble ranker. The job description is converted offline
+  into a per-job config (weighted skill facets, explicit disqualifiers, fusion
+  weights). At rank time, three independent lenses score every candidate: (1) a
+  deterministic rules score from the config, multiplied by a behavioral-availability
+  modifier built from the 23 Redrob signals; (2) faceted TF-IDF lexical recall; and
+  (3) MiniLM semantic similarity, precomputed offline and committed as a ~0.6 MB
+  artifact so ranking needs no torch or network. The three are fused with Reciprocal
+  Rank Fusion. Logically-impossible honeypot profiles are detected and excluded
+  (0 in the top 100). Everything is vectorized (pandas/numpy/scikit-learn); the full
+  100k pool ranks in ~30s, well inside the 5-minute CPU budget. Reasoning for each
+  pick cites concrete profile evidence mapped to JD requirements, with honest concerns.
+
+# ============================================================================
+# Declarations
+# ============================================================================
+declarations:
+  read_submission_spec: true
+  code_is_original_work: true
+  no_collusion: true
+  honeypot_check_done: true
+  reproduction_tested: true
