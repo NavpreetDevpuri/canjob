@@ -1,0 +1,5 @@
+# Pre-computation only: needed by precompute.py to (re)build the semantic artifact.
+# rank.py and the Docker image do NOT need these; they read the committed
+# canjob/config/jobs/<key>/precomputed/semantic_scores.npz instead. Heavy (~2 GB).
+torch==2.8.0
+transformers==4.52.4
