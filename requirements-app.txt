@@ -1,0 +1,3 @@
+# Bonus web app only (backend API + single-page UI). Not needed for ranking.
+fastapi==0.115.6
+uvicorn==0.34.0

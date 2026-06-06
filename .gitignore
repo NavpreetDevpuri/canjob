@@ -19,7 +19,13 @@ __pycache__/
 .ipynb_checkpoints/
 .venv/
 venv/
+.appenv/
 .DS_Store
+
+# Web app local database (regenerated on first launch)
+app/*.db
+app/*.db-wal
+app/*.db-shm
 
 # Editable presentation source (the PDF in docs/ is the committed deliverable)
 docs/*.pptx

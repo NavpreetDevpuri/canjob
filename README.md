@@ -90,6 +90,25 @@ The image installs only core deps (no torch) and copies the committed semantic a
 
 `demo_colab.ipynb` is a run-all Google Colab notebook (Section 10.5 sandbox): a config panel at the top, a small bundled sample (or your own upload, or the full dataset via Drive), and an end-to-end run that prints the ranked table, a validity check, and a score chart.
 
+## Web UI (bonus)
+
+A small FastAPI backend and a single-page UI (`app/`) wrap the exact same ranking engine so you can drive it from a browser.
+
+```bash
+pip install -r requirements.txt -r requirements-app.txt
+# optional: point at the full dataset (otherwise it seeds the bundled sample)
+export CANJOB_CANDIDATES=$PWD/../India_runs_data_and_ai_challenge/candidates.jsonl
+python app/server.py          # open http://127.0.0.1:8000
+```
+
+Three tabs, one page:
+
+- **Jobs** - the released JD is pre-loaded as the default job and rendered as markdown. Add or remove ad-hoc jobs by pasting a JD (ad-hoc jobs are ranked from their JD text; the default job uses the tuned config + precomputed semantic scores).
+- **Candidates** - the candidate pool is pre-loaded into the backend, searchable and paginated; add or remove candidates.
+- **Matching** - run (or re-run) a match for any job over the pool with a live progress bar. Progress is stored server-side, so it keeps updating across refreshes. Each finished run shows the top-K table with 0-1 fit scores and the same evidence-based reasoning, and the per-job cards show which jobs have been executed and over how many candidates.
+
+State lives in a local SQLite file (`app/canjob_app.db`, gitignored). The UI runs the identical featurize -> 3-lens score -> RRF -> honeypot-filter pipeline as `rank.py`.
+
 ## Layout
 
 ```
@@ -102,7 +121,8 @@ canjob/
   candidate_adapter.py  candidate -> SearchableDocument (search-engine path)
   config/jobs/<key>/    per-job config + committed semantic artifact
 search_engine/          local lexical search engine (reusable reference module)
-requirements.txt / requirements-embeddings.txt / environment.yml
+app/                    bonus web UI: FastAPI backend + single-page frontend
+requirements.txt / requirements-embeddings.txt / requirements-app.txt / environment.yml
 Dockerfile / run.sh / run.bat / demo_colab.ipynb
 docs/canjob_idea_submission.pdf   approach presentation (what we built, why, and how)
 submission_metadata.yaml

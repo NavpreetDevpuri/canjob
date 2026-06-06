@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CanJob — Candidate Discovery & Ranking</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<style>
+  body { background:#0f172a; color:#e6ecf7; }
+  .card { background:#15203a; border:1px solid #1f2c4a; }
+  .card2 { background:#1c2a49; border:1px solid #26365c; }
+  .accent { color:#35c28c; } .accent2 { color:#4f9cf5; }
+  .btn { background:#35c28c; color:#06281c; font-weight:600; }
+  .btn:hover { filter:brightness(1.08); }
+  .btn2 { background:#26365c; color:#dbe6ff; }
+  .btn-danger { background:#3a2030; color:#ff9bb0; }
+  input, textarea, select { background:#0f1830; border:1px solid #26365c; color:#e6ecf7; }
+  input:focus, textarea:focus, select:focus { outline:2px solid #35c28c55; }
+  .tab.active { color:#35c28c; border-color:#35c28c; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; color:#9fb0d0; font-weight:600; }
+  td, th { padding:8px 10px; border-bottom:1px solid #1f2c4a; vertical-align:top; }
+  .pill { font-size:11px; padding:2px 8px; border-radius:999px; }
+  .bar { background:#0f1830; border-radius:999px; overflow:hidden; }
+  .bar > div { background:linear-gradient(90deg,#35c28c,#4f9cf5); height:100%; transition:width .3s; }
+  ::-webkit-scrollbar{height:8px;width:8px} ::-webkit-scrollbar-thumb{background:#26365c;border-radius:8px}
+</style>
+</head>
+<body class="min-h-screen">
+<header class="border-b border-[#1f2c4a] sticky top-0 z-10" style="background:#0d1426">
+  <div class="max-w-6xl mx-auto px-5 py-3 flex items-center gap-6">
+    <div class="text-2xl font-bold">can<span class="accent">job</span></div>
+    <div class="text-xs text-[#7e8db0] hidden sm:block">Intelligent Candidate Discovery &amp; Ranking</div>
+    <nav class="ml-auto flex gap-1 text-sm">
+      <button data-tab="jobs"      class="tab active px-3 py-2 border-b-2 border-transparent">Jobs</button>
+      <button data-tab="candidates" class="tab px-3 py-2 border-b-2 border-transparent text-[#9fb0d0]">Candidates</button>
+      <button data-tab="matching"  class="tab px-3 py-2 border-b-2 border-transparent text-[#9fb0d0]">Matching</button>
+    </nav>
+  </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-5 py-6">
+
+  <!-- JOBS -->
+  <section id="view-jobs">
+    <div class="grid md:grid-cols-3 gap-5">
+      <div class="card rounded-xl p-4 md:col-span-1">
+        <h2 class="font-semibold mb-3">Add a job</h2>
+        <input id="job-name" class="w-full rounded-lg px-3 py-2 mb-2 text-sm" placeholder="Job title" />
+        <textarea id="job-jd" rows="9" class="w-full rounded-lg px-3 py-2 text-sm font-mono" placeholder="Paste the job description (markdown supported)"></textarea>
+        <button onclick="addJob()" class="btn w-full rounded-lg py-2 mt-2 text-sm">Add job</button>
+        <p class="text-xs text-[#7e8db0] mt-2">Ad-hoc jobs are ranked from their JD text. The default job uses the tuned config + precomputed semantic scores.</p>
+      </div>
+      <div class="card rounded-xl p-4 md:col-span-2">
+        <h2 class="font-semibold mb-3">Jobs</h2>
+        <div class="overflow-x-auto"><table>
+          <thead><tr><th>Name</th><th>Runs</th><th>Created</th><th></th></tr></thead>
+          <tbody id="jobs-body"></tbody>
+        </table></div>
+      </div>
+    </div>
+    <div id="jd-view" class="card rounded-xl p-5 mt-5 hidden">
+      <div class="flex items-center mb-3"><h3 id="jd-view-title" class="font-semibold"></h3>
+        <button onclick="document.getElementById('jd-view').classList.add('hidden')" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button></div>
+      <div id="jd-view-body" class="prose prose-invert max-w-none text-sm leading-relaxed"></div>
+    </div>
+  </section>
+
+  <!-- CANDIDATES -->
+  <section id="view-candidates" class="hidden">
+    <div class="grid md:grid-cols-3 gap-5">
+      <div class="card rounded-xl p-4 md:col-span-1">
+        <h2 class="font-semibold mb-3">Add a candidate</h2>
+        <input id="c-title" class="w-full rounded-lg px-3 py-2 mb-2 text-sm" placeholder="Current title" />
+        <div class="flex gap-2 mb-2">
+          <input id="c-yoe" type="number" step="0.1" class="w-1/2 rounded-lg px-3 py-2 text-sm" placeholder="Years exp" />
+          <input id="c-loc" class="w-1/2 rounded-lg px-3 py-2 text-sm" placeholder="Location" />
+        </div>
+        <input id="c-skills" class="w-full rounded-lg px-3 py-2 mb-2 text-sm" placeholder="Skills (comma separated)" />
+        <textarea id="c-summary" rows="3" class="w-full rounded-lg px-3 py-2 text-sm" placeholder="Short summary"></textarea>
+        <button onclick="addCandidate()" class="btn w-full rounded-lg py-2 mt-2 text-sm">Add candidate</button>
+      </div>
+      <div class="card rounded-xl p-4 md:col-span-2">
+        <div class="flex items-center mb-3 gap-3">
+          <h2 class="font-semibold">Candidates <span id="c-count" class="text-xs text-[#7e8db0]"></span></h2>
+          <input id="c-search" class="ml-auto rounded-lg px-3 py-1.5 text-sm w-48" placeholder="Search…" oninput="debouncedSearch()" />
+        </div>
+        <div class="overflow-x-auto"><table>
+          <thead><tr><th>ID</th><th>Title</th><th>YoE</th><th>Location</th><th></th></tr></thead>
+          <tbody id="cand-body"></tbody>
+        </table></div>
+        <div class="flex items-center gap-3 mt-3 text-sm">
+          <button onclick="candPage(-1)" class="btn2 rounded-lg px-3 py-1">Prev</button>
+          <span id="cand-page" class="text-[#9fb0d0]"></span>
+          <button onclick="candPage(1)" class="btn2 rounded-lg px-3 py-1">Next</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MATCHING -->
+  <section id="view-matching" class="hidden">
+    <div class="card rounded-xl p-4 mb-5 flex flex-wrap items-end gap-4">
+      <div><div class="text-xs text-[#7e8db0]">Candidates in pool</div><div id="m-count" class="text-2xl font-bold accent">—</div></div>
+      <div><label class="text-xs text-[#7e8db0] block">Top K</label><input id="m-topk" type="number" value="100" class="rounded-lg px-3 py-1.5 text-sm w-24" /></div>
+      <div><label class="text-xs text-[#7e8db0] block">Limit (0 = all)</label><input id="m-limit" type="number" value="2000" class="rounded-lg px-3 py-1.5 text-sm w-28" /></div>
+      <p class="text-xs text-[#7e8db0] flex-1 min-w-[200px]">Pick a job below and run a match. Progress is stored server-side, so it keeps updating even after a refresh.</p>
+    </div>
+    <div id="match-jobs" class="grid md:grid-cols-2 gap-5"></div>
+
+    <div id="results" class="card rounded-xl p-5 mt-5 hidden">
+      <div class="flex items-center mb-3 gap-3">
+        <h3 class="font-semibold">Results <span id="results-meta" class="text-xs text-[#7e8db0]"></span></h3>
+        <button onclick="document.getElementById('results').classList.add('hidden')" class="btn2 ml-auto rounded-lg px-3 py-1 text-xs">Close</button>
+      </div>
+      <div class="overflow-x-auto"><table>
+        <thead><tr><th>#</th><th>Candidate</th><th>Score</th><th>Reasoning</th></tr></thead>
+        <tbody id="results-body"></tbody>
+      </table></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="fixed bottom-5 right-5 card2 rounded-lg px-4 py-2 text-sm hidden"></div>
+
+<script>
+const $ = (s) => document.querySelector(s);
+async function api(path, opts) {
+  const r = await fetch("/api" + path, opts);
+  if (!r.ok) { const t = await r.text(); throw new Error(t || r.status); }
+  return r.status === 204 ? null : r.json();
+}
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.remove("hidden"); setTimeout(() => t.classList.add("hidden"), 2200); }
+function esc(s) { return (s ?? "").toString().replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+// ---- tabs ----
+document.querySelectorAll(".tab").forEach(b => b.onclick = () => showTab(b.dataset.tab));
+function showTab(name) {
+  document.querySelectorAll(".tab").forEach(t => { const on = t.dataset.tab === name; t.classList.toggle("active", on); t.classList.toggle("text-[#9fb0d0]", !on); });
+  ["jobs","candidates","matching"].forEach(v => $("#view-" + v).classList.toggle("hidden", v !== name));
+  if (name === "jobs") loadJobs();
+  if (name === "candidates") loadCandidates();
+  if (name === "matching") loadMatching();
+}
+
+// ---- jobs ----
+async function loadJobs() {
+  const jobs = await api("/jobs");
+  $("#jobs-body").innerHTML = jobs.map(j => `
+    <tr>
+      <td>${esc(j.name)} ${j.is_default ? '<span class="pill" style="background:#0c2c22;color:#35c28c">default</span>' : ''}</td>
+      <td>${j.run_count}</td>
+      <td class="text-[#9fb0d0]">${esc(j.created_at || '')}</td>
+      <td class="text-right whitespace-nowrap">
+        <button onclick='viewJD(${j.id})' class="btn2 rounded px-2 py-1 text-xs">View JD</button>
+        ${j.is_default ? '' : `<button onclick='delJob(${j.id})' class="btn-danger rounded px-2 py-1 text-xs ml-1">Delete</button>`}
+      </td>
+    </tr>`).join("");
+}
+async function addJob() {
+  const name = $("#job-name").value.trim(), jd = $("#job-jd").value.trim();
+  if (!name || !jd) return toast("Name and JD required");
+  await api("/jobs", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ name, jd_markdown: jd }) });
+  $("#job-name").value = ""; $("#job-jd").value = ""; toast("Job added"); loadJobs();
+}
+async function delJob(id) { await api("/jobs/" + id, { method: "DELETE" }); loadJobs(); }
+async function viewJD(id) {
+  const j = await api("/jobs/" + id);
+  $("#jd-view-title").textContent = j.name;
+  $("#jd-view-body").innerHTML = marked.parse(j.jd_markdown || "");
+  $("#jd-view").classList.remove("hidden");
+  $("#jd-view").scrollIntoView({ behavior: "smooth" });
+}
+
+// ---- candidates ----
+let cOffset = 0, cQuery = "", cTotal = 0; const cLimit = 25;
+async function loadCandidates() {
+  const d = await api(`/candidates?offset=${cOffset}&limit=${cLimit}&q=${encodeURIComponent(cQuery)}`);
+  cTotal = d.total;
+  $("#c-count").textContent = `(${d.total.toLocaleString()})`;
+  $("#cand-body").innerHTML = d.items.map(c => `
+    <tr>
+      <td class="font-mono text-xs">${esc(c.candidate_id)} ${c.added ? '<span class="pill" style="background:#10243f;color:#4f9cf5">added</span>' : ''}</td>
+      <td>${esc(c.title)}</td><td>${c.yoe ?? '—'}</td><td class="text-[#9fb0d0]">${esc(c.location)}</td>
+      <td class="text-right"><button onclick='delCand("${esc(c.candidate_id)}")' class="btn-danger rounded px-2 py-1 text-xs">Remove</button></td>
+    </tr>`).join("");
+  const from = d.total ? cOffset + 1 : 0;
+  $("#cand-page").textContent = `${from}–${Math.min(cOffset + cLimit, d.total)} of ${d.total.toLocaleString()}`;
+}
+function candPage(dir) { const n = cOffset + dir * cLimit; if (n >= 0 && n < cTotal) { cOffset = n; loadCandidates(); } }
+let searchTimer; function debouncedSearch() { clearTimeout(searchTimer); searchTimer = setTimeout(() => { cQuery = $("#c-search").value.trim(); cOffset = 0; loadCandidates(); }, 250); }
+async function addCandidate() {
+  const body = { title: $("#c-title").value, yoe: parseFloat($("#c-yoe").value) || null, location: $("#c-loc").value, skills: $("#c-skills").value, summary: $("#c-summary").value };
+  if (!body.title) return toast("Title required");
+  await api("/candidates", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify(body) });
+  ["c-title","c-yoe","c-loc","c-skills","c-summary"].forEach(i => $("#"+i).value = "");
+  toast("Candidate added"); cOffset = 0; loadCandidates();
+}
+async function delCand(id) { await api("/candidates/" + encodeURIComponent(id), { method: "DELETE" }); loadCandidates(); }
+
+// ---- matching ----
+const polling = {};
+async function loadMatching() {
+  const s = await api("/matching/summary");
+  $("#m-count").textContent = s.candidate_count.toLocaleString();
+  $("#match-jobs").innerHTML = s.jobs.map(j => {
+    const lr = j.last_run;
+    const status = lr ? lr.status : "not run";
+    const color = status === "done" ? "#35c28c" : status === "error" ? "#ff9bb0" : status === "running" ? "#4f9cf5" : "#7e8db0";
+    const prog = lr ? lr.progress : 0;
+    return `<div class="card2 rounded-xl p-4" id="job-card-${j.job_id}">
+      <div class="flex items-center gap-2">
+        <div class="font-semibold">${esc(j.job_name)}</div>
+        ${j.is_default ? '<span class="pill" style="background:#0c2c22;color:#35c28c">default</span>' : ''}
+        <span class="pill ml-auto" style="background:#0f1830;color:${color}">${status}</span>
+      </div>
+      <div class="text-xs text-[#7e8db0] mt-1">${lr ? `last run #${lr.id} • ${lr.n_candidates ?? '—'} candidates • top ${lr.topk} • ${esc(lr.stage||'')}` : 'no runs yet'}</div>
+      <div class="bar h-2 mt-2"><div style="width:${prog}%"></div></div>
+      <div class="flex gap-2 mt-3">
+        <button onclick="runMatch(${j.job_id})" class="btn rounded-lg px-3 py-1.5 text-sm">${lr ? 'Re-run' : 'Run match'}</button>
+        ${lr && lr.status === 'done' ? `<button onclick="showResults(${lr.id}, '${esc(j.job_name)}')" class="btn2 rounded-lg px-3 py-1.5 text-sm">View results</button>` : ''}
+      </div>
+    </div>`;
+  }).join("");
+  // resume polling for any running job
+  s.jobs.forEach(j => { if (j.last_run && j.last_run.status === "running") pollRun(j.job_id, j.last_run.id); });
+}
+async function runMatch(jobId) {
+  const topk = parseInt($("#m-topk").value) || 100;
+  const limit = parseInt($("#m-limit").value) || 0;
+  const { run_id } = await api("/runs", { method: "POST", headers: {"Content-Type":"application/json"}, body: JSON.stringify({ job_id: jobId, topk, limit }) });
+  toast("Run started"); pollRun(jobId, run_id);
+}
+function pollRun(jobId, runId) {
+  if (polling[jobId]) clearInterval(polling[jobId]);
+  polling[jobId] = setInterval(async () => {
+    let r; try { r = await api("/runs/" + runId); } catch { return; }
+    const card = $("#job-card-" + jobId); if (!card) return;
+    const bar = card.querySelector(".bar > div"); if (bar) bar.style.width = r.progress + "%";
+    const pill = card.querySelector(".pill:last-of-type");
+    if (pill) { pill.textContent = r.status; pill.style.color = r.status === "done" ? "#35c28c" : r.status === "error" ? "#ff9bb0" : "#4f9cf5"; }
+    const sub = card.querySelector(".text-xs");
+    if (sub) sub.textContent = `run #${r.id} • ${r.n_candidates ?? '—'} candidates • top ${r.topk} • ${r.stage || ''}`;
+    if (r.status === "done" || r.status === "error") { clearInterval(polling[jobId]); delete polling[jobId]; loadMatching(); if (r.status==='done') showResults(r.id, ''); }
+  }, 1000);
+}
+async function showResults(runId, name) {
+  const rows = await api(`/runs/${runId}/results`);
+  $("#results-meta").textContent = `run #${runId} • ${rows.length} candidates`;
+  $("#results-body").innerHTML = rows.map(r => `
+    <tr><td class="accent font-bold">${r.rank}</td>
+      <td class="font-mono text-xs">${esc(r.candidate_id)}</td>
+      <td>${r.score.toFixed(4)}</td>
+      <td class="text-[#c7d2e8] text-xs leading-relaxed">${esc(r.reasoning)}</td></tr>`).join("");
+  $("#results").classList.remove("hidden");
+  $("#results").scrollIntoView({ behavior: "smooth" });
+}
+
+showTab("jobs");
+</script>
+</body>
+</html>
