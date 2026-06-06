@@ -468,6 +468,44 @@ def get_results(run_id: int) -> List[Dict[str, Any]]:
     return [dict(r) for r in rows]
 
 
+def import_run(results: List[Dict[str, Any]], n_candidates: Optional[int] = None,
+               took_seconds: Optional[int] = None, job_id: Optional[int] = None,
+               set_id: Optional[int] = None) -> int:
+    """Insert an already-computed ranking (e.g. from the Colab rank.py run) as a finished
+    run so the web dashboard can display it. Defaults to the default job + full pool set."""
+    conn = get_conn()
+    if job_id is None:
+        j = conn.execute("SELECT id FROM jobs ORDER BY is_default DESC, id ASC LIMIT 1").fetchone()
+        job_id = j["id"] if j else None
+    if set_id is None:
+        s = conn.execute("SELECT id FROM candidate_sets WHERE kind='all' LIMIT 1").fetchone()
+        set_id = s["id"] if s else None
+    finished = now()
+    created = (time.strftime(_TS, time.localtime(time.time() - took_seconds))
+               if took_seconds else finished)
+    rid = conn.execute(
+        "INSERT INTO runs (job_id, candidate_set_id, status, progress, stage, n_candidates, "
+        "topk, created_at, finished_at) VALUES (?,?, 'done', 100, 'done', ?, ?, ?, ?)",
+        (job_id, set_id, n_candidates if n_candidates is not None else len(results),
+         len(results), created, finished)).lastrowid
+    conn.executemany(
+        "INSERT INTO run_results (run_id, rank, candidate_id, score, reasoning) VALUES (?,?,?,?,?)",
+        [(rid, r["rank"], r["candidate_id"], r["score"], r["reasoning"]) for r in results])
+    conn.commit(); conn.close()
+    return rid
+
+
+def import_run_from_csv(csv_path: str, n_candidates: Optional[int] = None,
+                        took_seconds: Optional[int] = None) -> int:
+    import csv as _csv
+    rows = []
+    with open(csv_path, encoding="utf-8") as f:
+        for r in _csv.DictReader(f):
+            rows.append({"rank": int(r["rank"]), "candidate_id": r["candidate_id"],
+                         "score": float(r["score"]), "reasoning": r.get("reasoning", "")})
+    return import_run(rows, n_candidates=n_candidates, took_seconds=took_seconds)
+
+
 def latest_run(job_id: int, set_id: int) -> Optional[Dict[str, Any]]:
     conn = get_conn()
     r = conn.execute(
