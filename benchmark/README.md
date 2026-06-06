@@ -8,10 +8,13 @@ competition metrics (NDCG@10, NDCG@50, MAP, P@10).
 
 [`cnamuangtoun/resume-job-description-fit`](https://huggingface.co/datasets/cnamuangtoun/resume-job-description-fit)
 (test split): 1,759 `(resume, job_description)` pairs, each with a human label
-**Good Fit / Potential Fit / No Fit**. We map those to graded relevance **2 / 1 / 0**,
-group resumes by job (71 jobs; we keep the ones with >= 30 candidates so the metrics
-are meaningful), rank each job's pool, and score against the labels. Binary metrics
-(MAP, P@10) count only **Good Fit** as relevant; NDCG is graded.
+**Good Fit / Potential Fit / No Fit** (graded relevance 2 / 1 / 0), across 71 jobs and
+477 unique resumes. For each job we rank **the entire pool of 477 candidates** (the real
+retrieval task) and check how high the recruiter's Good-Fit picks land. Resumes the
+dataset did not judge for a job are treated as No-Fit, which is conservative: a genuinely
+good but unjudged candidate we rank highly counts *against* us, so the true quality is at
+least what is reported. Binary metrics (MAP, P@10) count only **Good Fit** as relevant;
+NDCG is graded.
 
 ## What is tested
 
@@ -37,35 +40,40 @@ pip install -r benchmark/requirements.txt    # adds torch+transformers (benchmar
 python benchmark/run_benchmark.py            # downloads the dataset once, then scores
 ```
 
-## Result (macro-averaged over 14 jobs, test split)
+## Result (macro-averaged over 19 jobs, ranking all 477 candidates per job)
 
-| method | NDCG@10 | NDCG@50 | MAP | P@10 |
-|---|---|---|---|---|
-| random floor | 0.565 | 0.769 | 0.573 | 0.532 |
-| tfidf (word) | 0.551 | 0.779 | 0.596 | 0.529 |
-| tfidf (char) | 0.594 | 0.793 | 0.612 | 0.557 |
-| **embeddings (MiniLM)** | **0.688** | **0.823** | **0.642** | **0.621** |
-| ensemble (RRF, semantic-led) | 0.669 | 0.815 | 0.633 | 0.614 |
+| method | NDCG@10 | NDCG@50 | MAP | P@10 | P@10 vs random |
+|---|---|---|---|---|---|
+| random floor | 0.049 | 0.084 | 0.061 | 0.047 | 1x |
+| tfidf (word) | 0.205 | 0.235 | 0.137 | 0.189 | 4x |
+| tfidf (char) | 0.150 | 0.215 | 0.124 | 0.126 | 3x |
+| embeddings (MiniLM) | 0.210 | 0.257 | 0.150 | 0.211 | 5x |
+| **ensemble (RRF, semantic-led)** | **0.219** | **0.267** | **0.156** | 0.200 | 4x |
 
 **How to read the numbers** (all 0–1, higher = better; the `random floor` is the score
-from shuffling the candidates, so the gap above it is the real skill):
+from shuffling, so the real skill is the *multiple* above it):
 
-- **NDCG@10 / NDCG@50** — is the top 10 / top 50 in the right order, best-fit first? 1.0 = perfect.
+- **P@10** — fraction of our top 10 that are genuine "Good Fit": ~0.20 (≈ 2 of 10) vs
+  ~0.047 by chance = **~4x more good fits at the top than random**.
+- **NDCG@10 / NDCG@50** — is the top 10 / 50 in the right order, best-fit first? 1.0 = perfect.
 - **MAP** — overall ordering quality across *all* the good-fit candidates.
-- **P@10** — fraction of our top 10 that are genuine "Good Fit" (0.62 ≈ 6 of 10, vs ~5.3 by chance).
 
-These pools are ~50% good-fit, so even a random shuffle scores ~0.55; that is why the
-absolute numbers look high and the meaningful signal is the consistent lift over the floor.
+**Why the absolute numbers are modest (and that's expected):** this is the hardest fair
+test — rank the entire pool from scratch, count only the strict "Good Fit" as a win, and
+treat any unjudged resume as a No-Fit (so a good candidate we surface but nobody labelled
+counts against us). Several JDs are vague boilerplate with nothing concrete to match on,
+and "fit" is a subjective recruiter call. Under those conservative rules a 4–5x lift over
+chance is a strong, honest signal.
 
 **Takeaways**
 
-- Every learned lens beats the random floor on data we never saw or tuned on:
+- Every learned lens beats the random floor by 3–5x on data we never saw or tuned on:
   the ranking method is sound, not overfit to the challenge JD.
-- The **MiniLM semantic lens is the single strongest signal** (+22% NDCG@10 over
-  random), which empirically validates the central design choice of CanJob.
-- With no rules lens available on free-text resumes, the **semantic-led ensemble
-  tracks the best single lens** and adds lexical robustness; on a precise technical
-  JD (our actual task) the lexical + rules lenses contribute much more, which is
-  exactly where they remove keyword-stuffers.
+- The **RRF ensemble is the best method overall** (top NDCG@10, NDCG@50 and MAP) — exactly
+  what fusing three complementary lenses is supposed to deliver.
+- The MiniLM semantic lens is the strongest single lens, validating that core choice.
+- This tests only the generalisable recall core; the Redrob rules + eligibility gate (the
+  real differentiator) is validated on the challenge data, where it drops the off-domain
+  "Content Writer" from #1 to #21,804 / 100,000 with 0 honeypots in the top 100.
 
 Numbers are reproducible with the command above and saved to `results.json`.
