@@ -39,7 +39,17 @@
     "llamaindex",
     "bert",
     "gpt",
-    "semantic search"
+    "semantic search",
+    "sentence transformers",
+    "sentence-transformers",
+    "pinecone",
+    "weaviate",
+    "opensearch",
+    "elasticsearch",
+    "recommendation systems",
+    "recommendation",
+    "recsys",
+    "object detection"
   ],
   "jd_titles_strong": [
     "ai engineer",

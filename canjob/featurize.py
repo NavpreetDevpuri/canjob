@@ -41,6 +41,21 @@ def _regex(keywords: List[str]) -> str:
     return "|".join(re.escape(k) for k in keywords)
 
 
+# Engineering / data / ML career-title vocabulary used to decide whether a profile
+# has EVER actually held a relevant role. Grounded in career_history titles (which a
+# keyword-stuffer cannot fake by pasting trendy skills into a summary). Overridable
+# per job via jd_facets.json -> "relevant_career_titles".
+DEFAULT_RELEVANT_CAREER_TITLES = [
+    "software engineer", "software developer", "ml engineer", "machine learning",
+    "ai engineer", "data scientist", "data engineer", "data analyst", "analytics engineer",
+    "research engineer", "research scientist", "applied scien", "deep learning",
+    "nlp engineer", "search engineer", "relevance engineer", "platform engineer",
+    "backend", "back-end", "full stack", "full-stack", "developer", "programmer",
+    "sde", "mlops", "devops", "computer scien", "engineer ii", "engineer i ",
+    "staff engineer", "principal engineer", "senior engineer", "tech lead", "technical lead",
+]
+
+
 # --------------------------------------------------------------------------- #
 # Feature frame
 # --------------------------------------------------------------------------- #
@@ -150,6 +165,13 @@ def build_feature_frame(candidates, filters_cfg, facets_cfg) -> pd.DataFrame:
         df["career_desc"] = ""
 
     df["avg_tenure_months"] = np.where(df["num_roles"] > 0, df["total_career_months"] / df["num_roles"].clip(lower=1), 0)
+
+    # Has the candidate ever held a genuinely relevant (eng/data/ML) role? Read from
+    # career-history TITLES only, which are far harder to game than a skills list or a
+    # summary. Drives the eligibility gate for off-domain keyword-stuffers.
+    rel = facets_cfg.get("relevant_career_titles", DEFAULT_RELEVANT_CAREER_TITLES)
+    rel_re = _regex(rel)
+    df["has_relevant_career"] = df["career_titles"].str.contains(rel_re, regex=True, na=False).to_numpy()
 
     # ---- education ----
     ed = pd.json_normalize(candidates, record_path="education", meta=["candidate_id"], errors="ignore")
@@ -350,7 +372,27 @@ def score_jd_aware(df: pd.DataFrame, filters_cfg, facets_cfg) -> Tuple[np.ndarra
 
     final = np.clip(base * penalty * modifier, 0, 1)
 
-    info = {"facet_scores": facet_scores, "flags": flags, "P": P, "E": E, "T": T, "Prod": Prod, "L": L}
+    # ---- eligibility gate (applied to the FUSED ensemble, not just this lens) ----
+    # The ensemble fuses rules + lexical + semantic. Lexical and semantic both read
+    # the candidate's OWN text (summary, headline, skill names), which is exactly
+    # what a keyword-stuffer games, so a "Content Writer | exploring GenAI" can win
+    # 2/3 lenses and float to the top on buzzwords. We therefore let the grounded
+    # rules act as a gate: a profile whose CURRENT title is off-domain AND that has
+    # never held an engineering/data/ML role (per career_history titles) is not a
+    # Senior AI Engineer, however many trendy skills it lists. Multiplicative and
+    # bounded, so it demotes hard without hard-excluding (kept honest/auditable).
+    has_rel = df["has_relevant_career"].to_numpy()
+    off_domain_no_eng = offdom & ~strong & ~has_rel
+    gate = np.ones(len(df))
+    gate = np.where(off_domain_no_eng, pp.get("offdomain_gate", 0.15), gate)
+    gate = np.where(stuffer, gate * pp.get("keyword_stuffer", 0.3), gate)
+    for fac in neg:  # framework-only / CV-only that the JD calls out, when unrescued
+        gate = np.where(flags.get(fac["id"], False), gate * fac["penalty"], gate)
+    gate = np.clip(gate, 0.05, 1.0)
+    flags["off_domain_no_eng"] = off_domain_no_eng
+
+    info = {"facet_scores": facet_scores, "flags": flags, "gate": gate,
+            "P": P, "E": E, "T": T, "Prod": Prod, "L": L}
     return final, info
 
 

@@ -43,7 +43,8 @@ One vectorized pipeline (pandas, numpy, scikit-learn), no per-row Python loops.
    - **Lexical**: several focused TF-IDF queries (retrieval, ranking/eval, full JD) for keyword recall, instead of one blurry mega-query.
    - **Semantic**: local MiniLM embeddings that match meaning, catching the JD's "Tier-5" candidate who built a recommender at a product company but never writes "RAG" or "Pinecone". These scores are precomputed offline (below).
 4. **Merge with Reciprocal Rank Fusion (RRF).** Each lens produces a ranking; the fused score is the sum over lenses of `weight / (k + rank)`. Combining on ranks means no single lens scale can dominate. Weights live in `jd_facets.json` under `ensemble_weights`.
-5. **Rank and explain.** Honeypots are dropped, ties break by `candidate_id`, scores are non-increasing, and each row gets a reasoning string citing concrete profile evidence.
+5. **Gate with the grounded rules.** The lexical and semantic lenses both read the candidate's *own* text (summary, headline, skill names), which is exactly what a keyword-stuffer games, so a "Content Writer | exploring GenAI" who pasted in vector-DB skills can win two of the three lenses on buzzwords alone. To prevent that, the deterministic model also acts as an *eligibility gate* on the fused score: a profile whose **current title is off-domain and that has never held an engineering/data/ML role** (judged from `career_history` titles, which are far harder to fake than a skills list) is multiplied down hard. It demotes rather than hard-excludes, so it stays honest and auditable. In practice this moves the off-domain Content Writer from #1 to ~#21,800 / 100,000, while genuine senior ML/NLP engineers fill the top, with honeypots still 0 in the top 100.
+6. **Rank and explain.** Honeypots are dropped, ties break by `candidate_id`, scores are non-increasing, and each row gets a reasoning string citing concrete profile evidence.
 
 ## Behavioral signals (the 23 Redrob signals)
 
@@ -52,6 +53,28 @@ The JD is explicit that a perfect-on-paper candidate who is unreachable is not a
 ## Honeypots
 
 The dataset hides ~80 honeypots (subtly impossible profiles), forced to relevance tier 0; >10% in the top 100 is disqualifying. We detect a high-precision set of impossible profiles and exclude them. Every run prints `Honeypots in submitted top 100: 0`, which you can verify directly. We deliberately avoid noisy checks (for example salary min>max) that fire on legitimate candidates.
+
+## Benchmark on public, labelled data
+
+Since the challenge data has no published labels, `benchmark/` validates the ranking
+method on an independent dataset that *does*:
+[`cnamuangtoun/resume-job-description-fit`](https://huggingface.co/datasets/cnamuangtoun/resume-job-description-fit)
+(1,759 resume↔JD pairs with human Good/Potential/No-Fit labels, 71 jobs). We rank each
+job's candidate pool with the same recall+fusion core and report the competition metrics:
+
+| method | NDCG@10 | NDCG@50 | MAP | P@10 |
+|---|---|---|---|---|
+| random floor | 0.565 | 0.769 | 0.573 | 0.532 |
+| tfidf (char) | 0.594 | 0.793 | 0.612 | 0.557 |
+| **embeddings (MiniLM)** | **0.688** | **0.823** | **0.642** | **0.621** |
+| ensemble (RRF, semantic-led) | 0.669 | 0.815 | 0.633 | 0.614 |
+
+Every learned lens beats random on data we never tuned on, and the MiniLM semantic lens
+(the heart of the engine) is the single strongest signal (+22% NDCG@10 over random),
+empirically validating that choice. The benchmark tests the generalisable recall core;
+the Redrob-specific rules/eligibility gate is validated on the challenge data itself,
+where it moves the off-domain "Content Writer" from #1 to #21,804/100,000 with 0
+honeypots in the top 100. Reproduce: `pip install -r benchmark/requirements.txt && python benchmark/run_benchmark.py`. See `benchmark/README.md`.
 
 ## Pre-computation (allowed; outside the timed window)
 
@@ -102,7 +125,17 @@ The image installs only core deps (no torch) and copies the committed semantic a
 
 A small FastAPI backend and a single-page UI (`app/`) wrap the exact same ranking engine so you can drive it from a browser.
 
-![CanJob web UI: pick job(s) and candidate set(s) in a Run-match popup, see a filterable list of runs with timing, and open a paginated ranked run with CSV/PDF export](docs/ui_screenshot.png)
+The **Matching** tab: a filterable list of runs and the ranked output (note the top picks are genuine senior ML/NLP engineers with deep, long-tenure skills, with evidence reasoning per row):
+
+![CanJob web UI - Matching: filterable runs list and the ranked candidates with 0-1 fit score and evidence reasoning](docs/ui_screenshot.png)
+
+The **Run-match popup**: tick the job(s) and candidate set(s); it queues every selected combination.
+
+![CanJob web UI - Run-match popup: select jobs x candidate sets to queue](docs/ui_runmodal.png)
+
+The **Candidates** tab: curated candidate sets on the left, headline previews with a hidden-character count, import/export, and clickable rows that open the full profile.
+
+![CanJob web UI - Candidates: candidate sets, headline previews, import/export](docs/ui_candidates.png)
 
 ```bash
 pip install -r requirements.txt -r requirements-app.txt
@@ -133,6 +166,7 @@ canjob/
   config/jobs/<key>/    per-job config + committed semantic artifact
 search_engine/          local lexical search engine (reusable reference module)
 app/                    bonus web UI: FastAPI backend + single-page frontend
+benchmark/              robustness check on a public labelled dataset (NDCG/MAP/P@10)
 requirements.txt / requirements-embeddings.txt / requirements-app.txt / environment.yml
 Dockerfile / run.sh / run.bat / demo_colab.ipynb
 docs/canjob_idea_submission.pdf   approach presentation (what we built, why, and how)

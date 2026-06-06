@@ -1,0 +1,10 @@
+# Benchmark-only dependencies (NOT needed for the timed ranking step).
+# The benchmark may use the network and MiniLM; the product ranking step does neither.
+numpy
+pandas
+scikit-learn
+pyarrow
+requests
+certifi
+torch
+transformers

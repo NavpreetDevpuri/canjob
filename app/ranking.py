@@ -111,7 +111,11 @@ def _execute(run_id: int) -> None:
 
     names = [n for n in signals if ew.get(n, 0) != 0]
     fused = fz.rrf_merge([signals[n] for n in names], weights=[ew.get(n, 1.0) for n in names])
-    fused = np.round(rk.scale_unit(fused), 4)
+    fused = rk.scale_unit(fused)
+    gate = info.get("gate")  # demote off-domain keyword-stuffers (same gate as rank.py)
+    if gate is not None:
+        fused = rk.scale_unit(fused * gate)
+    fused = np.round(fused, 4)
     order = rk.ranked_order(fused, excluded, ids)
 
     db.update_run(run_id, stage="building results", progress=95)

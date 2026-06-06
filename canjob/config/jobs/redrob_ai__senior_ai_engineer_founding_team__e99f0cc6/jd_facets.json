@@ -303,6 +303,7 @@
   },
   "penalty_params": {
     "keyword_stuffer": 0.3,
+    "offdomain_gate": 0.15,
     "services_all": 0.6,
     "title_chaser": 0.8,
     "title_chaser_min_roles": 4,

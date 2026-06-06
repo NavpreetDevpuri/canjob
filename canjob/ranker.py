@@ -79,6 +79,7 @@ FACET_LABELS = {
     "opensource": "open-source",
 }
 CONCERN_LABELS = {
+    "off_domain_no_eng": "off-domain career: never held an engineering/data/ML role",
     "keyword_stuffer": "off-domain title with stuffed AI skills",
     "cv_speech_robotics": "CV/speech-primary, thin on NLP/IR",
     "langchain_only": "framework-only LLM exposure",
@@ -271,9 +272,15 @@ def main() -> int:
     rounded = {n: np.round(s, 4) for n, s in signals.items()}
 
     # RRF produces tiny raw values (~1/k). Rescale to a readable 0-1 fit score.
-    # This is a strictly monotonic transform, so the ranking is unchanged; it only
-    # makes the published score interpretable (1.0 = best fit in the pool).
     fused = scale_unit(fused)
+
+    # Eligibility gate: the deterministic JD-faithful model gates the fused score so
+    # off-domain keyword-stuffers (e.g. a Content Writer who pasted in vector-DB
+    # skills) cannot outrank genuine engineers via lexical/semantic recall of their
+    # own buzzwords. Monotonic within the eligible set; only demotes gated profiles.
+    gate = info.get("gate")
+    if gate is not None:
+        fused = scale_unit(fused * gate)
     fused = np.round(fused, 4)
 
     ensemble = ranked_order(fused, excluded, ids)

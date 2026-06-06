@@ -30,5 +30,8 @@ app/*.db-shm
 # Editable presentation source (the PDF in docs/ is the committed deliverable)
 docs/*.pptx
 
+# Benchmark dataset download (re-fetched by benchmark/run_benchmark.py; results.json IS committed)
+benchmark/data/
+
 # Local notes not part of the submission
 CHALLENGE_ANALYSIS.md
